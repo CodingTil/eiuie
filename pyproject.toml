@@ -10,14 +10,23 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 requires = [
+    "torch",
+    "tdqm",
+    "mpire",
+    "numpy",
+    "opencv-python",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project.scripts]
+eiui = "eiuie.main:main"
+
 [tool.hatch.build.targets.wheel]
-only-include = ["eiuie"]
+only-include = ["eiuie", "data"]
 
 [tool.hatch.build.targets.wheel.sources]
 "eiuie" = "eiuie"
+"data" = "eiuie/data"
