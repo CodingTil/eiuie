@@ -1,43 +1,37 @@
 from typing import Tuple
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
+import base_model as bm
 
 FILE = "data/pixel_dataset.ds"
 
 
 class PixelDataset(Dataset):
-    """
-    PixelDataset class.
+    def __init__(self, batch_size=1):
+        # Use numpy's memory mapping
+        raw_data = np.memmap(FILE, dtype=np.uint8, mode="r").reshape(-1, 15)
 
-    Attributes
-    ----------
-    df: pd.DataFrame
-        Dataframe.
-    """
+        # Convert each set of BGR values to HSI
+        hsi_data_list = []
+        for i in range(0, raw_data.shape[1], 3):
+            bgr_img = raw_data[:, i : i + 3].reshape(-1, 1, 3)
+            hsi_img = bm.BGR2HSI(bgr_img)
+            hsi_data_list.append(hsi_img.reshape(-1, 3))
 
-    df: pd.DataFrame
-
-    def __init__(self):
-        # Load binary data
-        with open(FILE, "rb") as f:
-            raw_data = f.read()
-
-        # Convert binary data to a numpy array of shape (num_rows, 15)
-        data_array = np.frombuffer(raw_data, dtype=np.uint8).reshape(-1, 15)
-
-        # Convert numpy array to pandas dataframe
-        self.df = pd.DataFrame(data_array)
+        self.data_array = np.concatenate(hsi_data_list, axis=1)
+        self.batch_size = batch_size
 
     def __len__(self) -> int:
-        return len(self.df)
+        return len(self.data_array) // self.batch_size
 
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
-        row = self.df.iloc[idx].values
+        start = idx * self.batch_size
+        end = start + self.batch_size
 
-        # Splitting the 15 values into two tensors: first 12 and last 3.
-        input_tensor = torch.tensor(row[:12], dtype=torch.float32)
-        output_tensor = torch.tensor(row[12:], dtype=torch.float32)
+        batch_data = self.data_array[start:end]
 
-        return input_tensor, output_tensor
+        inputs = torch.tensor(batch_data[:, :12], dtype=torch.float32)
+        outputs = torch.tensor(batch_data[:, 12:], dtype=torch.float32)
+
+        return inputs, outputs

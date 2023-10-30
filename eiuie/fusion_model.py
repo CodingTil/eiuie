@@ -93,7 +93,9 @@ class EarlyStopping:
             self.trace_func(
                 f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ..."
             )
-        torch.save(model.state_dict(), self.path)
+        if not os.path.exists(CHECKPOINT_DIRECTORY):
+            os.makedirs(CHECKPOINT_DIRECTORY)
+        torch.save(model.state_dict(), f"{CHECKPOINT_DIRECTORY}/{self.path}")
         self.val_loss_min = val_loss
 
 
@@ -144,6 +146,9 @@ class FusionModel(bm.BaseModel):
                 self.load_checkpoint(latest_checkpoint)
 
     def save_checkpoint(self, epoch: int, checkpoint_path: str):
+        # Ensure checkpoint directory exists
+        if not os.path.exists(CHECKPOINT_DIRECTORY):
+            os.makedirs(CHECKPOINT_DIRECTORY)
         torch.save(
             {
                 "epoch": epoch,
@@ -171,10 +176,15 @@ class FusionModel(bm.BaseModel):
         if not os.path.exists(CHECKPOINT_DIRECTORY):
             return None
         checkpoint_files = [
-            f for f in os.listdir(CHECKPOINT_DIRECTORY) if "checkpoint_epoch_" in f
+            f
+            for f in os.listdir(CHECKPOINT_DIRECTORY)
+            if "checkpoint_epoch_" in f or "best_model" in f
         ]
         if not checkpoint_files:
             return None
+
+        if "best_model" in checkpoint_files:
+            return "best_model.pt"
 
         # Sort based on epoch number
         checkpoint_files.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
@@ -242,23 +252,47 @@ class FusionModel(bm.BaseModel):
 
     def train_model(
         self,
-        total_epochs=100,
+        total_epochs=50,
         patience=5,
+        data_to_use=0.005,
         train_ratio=0.8,
+        batch_size=1024,
     ):
-        dataset = pxds.PixelDataset()
+        print("Loading dataset...")
+        dataset = pxds.PixelDataset(batch_size=batch_size)
         # Splitting dataset into training and validation subsets
-        train_size = int(train_ratio * len(dataset))
-        val_size = len(dataset) - train_size
-        train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+        print("Splitting dataset into training and validation subsets...")
+        data_len = int(data_to_use * len(dataset))
+        print("Data points to use:", data_len * batch_size)
+        train_size = int(train_ratio * data_len)
+        print("Training data points:", train_size * batch_size)
+        val_size = data_len - train_size
+        print("Validation data points:", val_size * batch_size)
+        _, train_dataset, val_dataset = random_split(
+            dataset,
+            [len(dataset) - data_len, train_size, val_size],
+            generator=torch.Generator().manual_seed(42),
+        )
 
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=32)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=True,
+        )
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=True,
+        )
 
         early_stopping = EarlyStopping(
             patience=patience,
             verbose=True,
-            path=f"{CHECKPOINT_DIRECTORY}/best_model.pt",
+            path=f"best_model.pt",
         )
 
         self.net.train()
