@@ -7,6 +7,7 @@ import base_model as bm
 import unsharp_masking
 import retinex
 import homomorphic_filtering
+import fusion_model
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
     parser.add_argument(
         "command",
         type=str,
-        choices=["single", "batch_process"],
+        choices=["single", "batch_process", "train"],
         help="Command to run",
     )
 
@@ -24,7 +25,7 @@ def main():
         "--method",
         type=str,
         default="unsharp_masking",
-        choices=["unsharp_masking", "retinex", "homomorphic_filtering"],
+        choices=["unsharp_masking", "retinex", "homomorphic_filtering", "fusion_model"],
         help="Filter method to use",
     )
 
@@ -45,6 +46,8 @@ def main():
             method = retinex.Retinex()
         case "homomorphic_filtering":
             method = homomorphic_filtering.HomomorphicFiltering()
+        case "fusion_model":
+            method = fusion_model.FusionModel()
         case _:
             raise ValueError(f"Unknown method: {args.method}")
 
@@ -57,6 +60,9 @@ def main():
             cv2.waitKey()
         case "batch_process":
             bp.batch_process_dataset()
+        case "train":
+            method = fusion_model.FusionModel()
+            method.train_model()
         case _:
             raise ValueError(f"Unknown command: {args.command}")
 
