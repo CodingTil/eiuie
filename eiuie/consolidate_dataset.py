@@ -50,4 +50,3 @@ def image_to_pandas(source_path) -> pd.DataFrame:
         }
         df = pd.DataFrame(data)
     return df
-
