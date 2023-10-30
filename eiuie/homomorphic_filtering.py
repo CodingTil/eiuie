@@ -28,6 +28,18 @@ class HomomorphicFiltering(bm.BaseModel):
         self.gamma_2 = 1.8
         self.rho = 100.0
 
+    @property
+    def name(self) -> str:
+        """
+        Name of the model.
+
+        Returns
+        -------
+        str
+            Name of the model.
+        """
+        return "homomorphic_filtering"
+
     def filter(self, value):
         return self.gamma_1 - self.gamma_2 * (
             1 / (1 + 2.415 * np.power(value / self.rho, 4))

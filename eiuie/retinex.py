@@ -176,5 +176,17 @@ class Retinex(bm.BaseModel):
         self.low_per = low_per
         self.high_per = high_per
 
+    @property
+    def name(self) -> str:
+        """
+        Name of the model.
+
+        Returns
+        -------
+        str
+            Name of the model.
+        """
+        return "retinex"
+
     def process_image(self, img):
         return msrcp(img)

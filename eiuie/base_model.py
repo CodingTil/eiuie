@@ -95,6 +95,19 @@ class BaseModel(ABC):
     Abstract class for all models.
     """
 
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """
+        Name of the model.
+
+        Returns
+        -------
+        str
+            Name of the model.
+        """
+        ...
+
     @abstractmethod
     def process_image(self, image: np.ndarray) -> np.ndarray:
         """

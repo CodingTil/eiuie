@@ -8,19 +8,31 @@ class UnsharpMasking(bm.BaseModel):
     """Unsharp Masking"""
 
     ksize: int
-    sigma: float
+    alpha: float
 
-    def __init__(self, ksize: int = 33, sigma: float = 20.0):
+    def __init__(self, ksize: int = 91, alpha: float = 0.6):
         """
         Parameters
         ----------
         ksize : int, optional
-            Kernel size, by default 33
-        sigma : float, optional
-            Gaussian kernel standard deviation, by default 20.0
+            Kernel size, by default 91
+        alpha : float, optional
+            Alpha value, by default 0.6
         """
         self.ksize = ksize
-        self.sigma = sigma
+        self.alpha = alpha
+
+    @property
+    def name(self) -> str:
+        """
+        Name of the model.
+
+        Returns
+        -------
+        str
+            Name of the model.
+        """
+        return "unsharp_masking"
 
     def process_image(self, image: np.ndarray) -> np.ndarray:
         """
@@ -36,6 +48,6 @@ class UnsharpMasking(bm.BaseModel):
         np.ndarray
             Processed image, as BGR.
         """
-        blurred = cv2.GaussianBlur(image, (self.ksize, self.ksize), self.sigma)
-        sharpened = cv2.addWeighted(image, 2, blurred, -1, 0)
+        blurred = cv2.GaussianBlur(image, (self.ksize, self.ksize), 0)
+        sharpened = cv2.addWeighted(image, 1 + self.alpha, blurred, -self.alpha, 0)
         return sharpened
