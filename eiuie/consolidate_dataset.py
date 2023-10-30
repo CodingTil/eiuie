@@ -1,45 +1,36 @@
 import numpy as np
 import pandas as pd
 import cv2
+import glob
 
 
-# # Text content to be written in the file
-# text_content = "This is an example ASCII text that will be written to a file."
-#
-# # source path and name
-# data_path = "../data/"
-#
-# # File path and name
-# file_path = "../data/dataset.txt"
-#
-# # Writing text content to a .txt file in ASCII encoding
-# with open(file_path, 'w') as file:
-#     file.write(text_content)
-
-
-def image_to_pandas(source_path) -> pd.DataFrame:
+def consolidate_data(image_files, source_path) -> pd.DataFrame:
     """
-    Convert image to pandas dataframe.
+    consolidate data
     """
+    # Path to intermediate images
+    path_retinex = source_path + "intermediate_images/retinex/"
+    path_unsharp = source_path + "intermediate_images/unsharp_masking/"
+    path_homomorphic = source_path + "intermediate_images/homomorphic_filtering/"
 
-    # Path to the image file
-    path_original = source_path + "lol_dataset/our485/"
-    path_retinex = source_path + "intermediate/retinex/"
-    path_unsharp = source_path + "intermediate/unsharp_masking/"
-    path_homomorphic = source_path + "intermediate/homomorphic_filtering/"
+    list_of_dicts = []
+    for image in image_files:
+        # read original image
+        image_original = cv2.imread(image)
 
-    # Read same image in each folder
-    for i in range(1, 486):
-        image_original = cv2.imread(path_original + str(i) + ".png")
+        # extract image id
+        i = image.split("/")[-1].split(".")[0]
+
+        # read corresponding intermediate images
         image_retinex = cv2.imread(path_retinex + str(i) + ".png")
         image_unsharp = cv2.imread(path_unsharp + str(i) + ".png")
         image_homomorphic = cv2.imread(path_homomorphic + str(i) + ".png")
 
         # reshape image to 2D array
-        image2D_original = image_original.reshape(-1, image_original.shape[-1])
-        image2D_retinex = image_retinex.reshape(-1, image_retinex.shape[-1])
-        image2D_unsharp = image_unsharp.reshape(-1, image_unsharp.shape[-1])
-        image2D_homomorphic = image_homomorphic.reshape(-1, image_homomorphic.shape[-1])
+        image2D_original = image_original.reshape((image_original.shape[0]*image_original.shape[1], 3))
+        image2D_retinex = image_retinex.reshape((image_retinex.shape[0]*image_retinex.shape[1], 3))
+        image2D_unsharp = image_unsharp.reshape((image_unsharp.shape[0]*image_unsharp.shape[1], 3))
+        image2D_homomorphic = image_homomorphic.reshape((image_homomorphic.shape[0]*image_homomorphic.shape[1], 3))
 
         # convert to single pandas dataframe
         data = {
@@ -48,6 +39,40 @@ def image_to_pandas(source_path) -> pd.DataFrame:
             "unsharp": image2D_unsharp,
             "homomorphic": image2D_homomorphic,
         }
-        df = pd.DataFrame(data)
-    return df
+        list_of_dicts.append(data)
+    return list_of_dicts
+
+def write_to_tsv(dataset, source_path):
+    """
+    Write dataset to tsv file.
+    """
+
+    # write to csv file
+    with open(source_path + "dataset.tsv", "w") as file:
+        for data in dataset:
+            # write data to tsv file in the following format: original, unsharp, homomorphic, retinex
+            for i in range(len(data["original"])):
+                line = [data['original'][i, 0], data['original'][i, 1], data['original'][i, 2],
+                        data['unsharp'][i, 0], data['unsharp'][i, 1], data['unsharp'][i, 2],
+                        data['homomorphic'][i, 0], data['homomorphic'][i, 1], data['homomorphic'][i, 2],
+                        data['retinex'][i, 0], data['retinex'][i, 1], data['retinex'][i, 2]]
+
+                # write line to file
+                line_str = '\t'.join(map(str, line))  # Convert vector elements to strings and join with tabs
+                file.write(line_str + '\n')  # Writing the vector as a single line
+    return 0
+
+
+# source path
+source_path = "../data/"
+
+# consolidate dataset in pandas dataframe
+glob_pattern = source_path + "lol_dataset/our485/low/*.png"
+image_files = glob.glob(glob_pattern)
+dataset = consolidate_data(image_files, source_path)
+
+# write dataset to tsv file
+write_to_tsv(dataset, source_path)
+
+
 
