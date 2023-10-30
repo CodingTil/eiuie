@@ -168,6 +168,8 @@ class FusionModel(bm.BaseModel):
         Optional[str]
             Path to the latest checkpoint file or None if no checkpoint found.
         """
+        if not os.path.exists(CHECKPOINT_DIRECTORY):
+            return None
         checkpoint_files = [
             f for f in os.listdir(CHECKPOINT_DIRECTORY) if "checkpoint_epoch_" in f
         ]
@@ -240,11 +242,11 @@ class FusionModel(bm.BaseModel):
 
     def train_model(
         self,
-        dataset: Dataset = pxds.PixelDataset(),
         total_epochs=100,
         patience=5,
         train_ratio=0.8,
     ):
+        dataset = pxds.PixelDataset()
         # Splitting dataset into training and validation subsets
         train_size = int(train_ratio * len(dataset))
         val_size = len(dataset) - train_size
@@ -261,6 +263,8 @@ class FusionModel(bm.BaseModel):
 
         self.net.train()
         for epoch in range(self.start_epoch, total_epochs):
+            print()
+            print(f"Epoch {epoch+1}/{total_epochs}")
             for inputs, targets in train_loader:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
@@ -269,8 +273,11 @@ class FusionModel(bm.BaseModel):
                 loss.backward()
                 self.optimizer.step()
             # After training, check validation loss
+            print("Validating...")
             val_loss = self.validate(val_loader)
+            print(f"Validation loss: {val_loss}")
 
+            print("Checking early stopping...")
             early_stopping(val_loss, self.net)
 
             if early_stopping.early_stop:
@@ -278,6 +285,7 @@ class FusionModel(bm.BaseModel):
                 break
 
             # Save checkpoint after every epoch
+            print("Saving checkpoint...")
             self.save_checkpoint(epoch, f"checkpoint_epoch_{epoch}.pth")
 
     def validate(self, val_loader):

@@ -1,16 +1,16 @@
 from typing import Tuple
-
+import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
-import pandas as pd
 
-TSV_FILE = "data/pixel_dataset.tsv"
+FILE = "data/pixel_dataset.ds"
 
 
 class PixelDataset(Dataset):
     """
     PixelDataset class.
-
+    
     Attributes
     ----------
     df: pd.DataFrame
@@ -20,8 +20,15 @@ class PixelDataset(Dataset):
     df: pd.DataFrame
 
     def __init__(self):
-        self.df = pd.read_table(TSV_FILE, header=None)
-        self.df = self.df.astype(float)
+        # Load binary data
+        with open(FILE, 'rb') as f:
+            raw_data = f.read()
+
+        # Convert binary data to a numpy array of shape (num_rows, 15)
+        data_array = np.frombuffer(raw_data, dtype=np.uint8).reshape(-1, 15)
+
+        # Convert numpy array to pandas dataframe
+        self.df = pd.DataFrame(data_array)
 
     def __len__(self) -> int:
         return len(self.df)

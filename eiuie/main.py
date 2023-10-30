@@ -4,6 +4,7 @@ import cv2
 
 import batch_process as bp
 import base_model as bm
+import consolidate_dataset as cd
 import unsharp_masking
 import retinex
 import homomorphic_filtering
@@ -16,7 +17,7 @@ def main():
     parser.add_argument(
         "command",
         type=str,
-        choices=["single", "batch_process", "train"],
+        choices=["single", "batch_process", "prepare_dataset", "train"],
         help="Command to run",
     )
 
@@ -60,6 +61,8 @@ def main():
             cv2.waitKey()
         case "batch_process":
             bp.batch_process_dataset()
+        case "prepare_dataset":
+            cd.prepare_dataset()
         case "train":
             method = fusion_model.FusionModel()
             method.train_model()
