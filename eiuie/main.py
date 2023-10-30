@@ -2,8 +2,6 @@ import argparse
 
 import cv2
 
-import download as download_module
-import image_getter as ig
 import batch_process as bp
 import base_model as bm
 import unsharp_masking
@@ -17,7 +15,7 @@ def main():
     parser.add_argument(
         "command",
         type=str,
-        choices=["download", "single", "batch_process"],
+        choices=["single", "batch_process"],
         help="Command to run",
     )
 
@@ -51,8 +49,6 @@ def main():
             raise ValueError(f"Unknown method: {args.method}")
 
     match args.command:
-        case "download":
-            download_module.main()
         case "single":
             image = cv2.imread(args.file)
             processed_image = method.process_image(image)
@@ -60,10 +56,7 @@ def main():
             cv2.imshow("image", processed_image)
             cv2.waitKey()
         case "batch_process":
-            images = ig.get_all_image_pairs()
-            print(f"Processing {len(images)} images...")
-            print(images)
-            bp.batch_process(method, images)
+            bp.batch_process_dataset()
         case _:
             raise ValueError(f"Unknown command: {args.command}")
 

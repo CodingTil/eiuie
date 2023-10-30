@@ -90,7 +90,6 @@ class HomomorphicFiltering(bm.BaseModel):
         np.ndarray
             Processed image, as BGR.
         """
-        og = image.copy()
         image = image.astype(np.float32)
         hsi = bm.BGR2HSI(image)
         hsi = self._process_image(hsi)
@@ -100,12 +99,4 @@ class HomomorphicFiltering(bm.BaseModel):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
         image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
-        # show difference image
-        diff = np.abs(og.astype(np.float32) - image.astype(np.float32))
-        diff = diff.astype(np.uint8)
-        cv2.imshow("diff", diff)
-        cv2.waitKey(0)
-        # show og
-        cv2.imshow("og", og)
-        cv2.waitKey(0)
         return image

@@ -1,10 +1,16 @@
-from typing import Tuple, Dict
-import numpy as np
-import cv2
-import base_model as bm
-from multiprocessing import Pool, Queue, Process, cpu_count
+from typing import Dict, List
+from multiprocessing import Pool, Queue, Process, Manager, cpu_count
+import glob
+import os
 
-SAVE_LOCATION: str = "data/intermediate"
+import cv2
+
+import base_model as bm
+import unsharp_masking
+import retinex
+import homomorphic_filtering
+
+SAVE_LOCATION: str = "data/intermediate_images"
 
 
 def write_to_file(queue: Queue) -> None:
@@ -20,19 +26,21 @@ def write_to_file(queue: Queue) -> None:
         file_name, image_data = queue.get()
         if file_name == "STOP":
             break
+        print(f"Writing {file_name}")
+        os.makedirs(os.path.dirname(file_name), exist_ok=True)
         cv2.imwrite(file_name, image_data)
 
 
 def process_and_enqueue(
-    model: bm.BaseModel, image_name: str, image_path: str, queue: Queue
+    models: List[bm.BaseModel], image_name: str, image_path: str, queue: Queue
 ) -> None:
     """
-    Process the image using the model and enqueue the result for writing.
+    Process the image using the models and enqueue the result for writing.
 
     Parameters
     ----------
-    model : bm.BaseModel
-        Model to be used for processing.
+    models : List[bm.BaseModel]
+        List of models to be used for processing.
     image_name : str
         Name of the image.
     raw_image : np.ndarray
@@ -40,41 +48,70 @@ def process_and_enqueue(
     queue : Queue
         Queue to enqueue the processed image for writing.
     """
-    raw_image = cv2.imread(image_path)
-    processed_image = model.process_image(raw_image)
-    absolute_file_name = f"{SAVE_LOCATION}/{model.name}/{image_name}.jpg"
-    queue.put((absolute_file_name, processed_image))
+    image = cv2.imread(image_path)
+    for model in models:
+        print(f"Processing {image_name} with {model.name}")
+        processed_image = model.process_image(image)
+        absolute_file_name = f"{SAVE_LOCATION}/{model.name}/{image_name}.png"
+        absolute_file_name = os.path.abspath(absolute_file_name)
+        queue.put((absolute_file_name, processed_image))
 
 
-def batch_process(model: bm.BaseModel, image_pairs: Dict[str, Tuple[str, str]]) -> None:
+def batch_process(models: List[bm.BaseModel], images: Dict[str, str]) -> None:
     """
     Batch process images using the model, and saves the results.
 
     Parameters
     ----------
-    model : bm.BaseModel
-        Model to be used for processing.
-    image_pairs : Dict[str, Tuple[str, str]]
-        Dictionary of image pairs, with image name as key and tuple of absolute paths as value.
+    models : List[bm.BaseModel]
+        List of models to be used for processing.
+    images : Dict[str, str]
+        Dictionary containing the image name and absolute path.
     """
-    # Create a queue for writing
-    write_queue = Queue()
+    # Create a managed queue for writing
+    with Manager() as manager:
+        write_queue = manager.Queue()
 
-    # Start the writing process
-    writer_process = Process(target=write_to_file, args=(write_queue,))
-    writer_process.start()
+        # Start the writing process
+        writer_process = Process(target=write_to_file, args=(write_queue,))
+        writer_process.start()
 
-    # Create a pool for parallel processing
-    with Pool(cpu_count() - 1) as pool:
-        for image_name, (raw_image, _) in image_pairs.items():
-            pool.apply_async(
-                process_and_enqueue, (model, image_name, raw_image, write_queue)
-            )
+        print(f"Processing {len(images)} images")
 
-        # Close the pool and wait for the tasks to complete
-        pool.close()
-        pool.join()
+        # Create a pool for parallel processing
+        async_results = []  # Collect all the AsyncResult objects here
+        with Pool(cpu_count() - 1) as pool:
+            for image_name, image_path in images.items():
+                res = pool.apply_async(
+                    process_and_enqueue,
+                    args=(models, image_name, image_path, write_queue),
+                )
+                async_results.append(res)
 
-    # Notify the writer process to stop
-    write_queue.put(("STOP", None))
-    writer_process.join()
+            print("Waiting for all tasks to complete")
+            # Ensure all tasks have finished
+            for result in async_results:
+                result.wait()
+
+            # Close the pool and wait for the tasks to complete
+            pool.close()
+            pool.join()
+
+        # Notify the writer process to stop
+        write_queue.put(("STOP", None))
+        writer_process.join()
+
+
+def batch_process_dataset() -> None:
+    glob_pattern = "data/lol_dataset/*/low/*.png"
+    images = glob.glob(glob_pattern)
+    images_dict = {
+        image.split("/")[-1].split(".")[0]: os.path.abspath(image) for image in images
+    }
+    print(f"Found {len(images_dict)} images")
+    models = [
+        unsharp_masking.UnsharpMasking(),
+        homomorphic_filtering.HomomorphicFiltering(),
+        retinex.Retinex(),
+    ]
+    batch_process(models, images_dict)
