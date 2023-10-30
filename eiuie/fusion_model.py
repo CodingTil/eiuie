@@ -44,20 +44,19 @@ class FusionNet(nn.Module):
 
 class EarlyStopping:
     def __init__(
-        self, patience=5, verbose=False, delta=0, path="checkpoint.pt", trace_func=print
+        self, patience=5, verbose=False, delta=0, trace_func=print
     ):
         """
-        Args:
-            patience (int): How long to wait after last time validation loss improved.
-                            Default: 5
-            verbose (bool): If True, prints a message for each validation loss improvement.
-                            Default: False
-            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
-                            Default: 0
-            path (str): Path for the checkpoint to be saved to.
-                            Default: 'checkpoint.pt'
-            trace_func (function): trace print function.
-                            Default: print
+        Parameters
+        ----------
+        patience
+            How long to wait after last time validation loss improved.
+        verbose
+            If True, prints a message for each validation loss improvement.
+        delta
+            Minimum change in the monitored quantity to qualify as an improvement.
+        trace_func
+            Function to trace the message.
         """
         self.patience = patience
         self.verbose = verbose
@@ -66,7 +65,6 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
-        self.path = path
         self.trace_func = trace_func
 
     def __call__(self, val_loss, model):
@@ -74,7 +72,6 @@ class EarlyStopping:
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
         elif score < self.best_score + self.delta:
             self.counter += 1
             self.trace_func(
@@ -84,19 +81,7 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
             self.counter = 0
-
-    def save_checkpoint(self, val_loss, model):
-        """Saves model when validation loss decreases."""
-        if self.verbose:
-            self.trace_func(
-                f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ..."
-            )
-        if not os.path.exists(CHECKPOINT_DIRECTORY):
-            os.makedirs(CHECKPOINT_DIRECTORY)
-        torch.save(model.state_dict(), f"{CHECKPOINT_DIRECTORY}/{self.path}")
-        self.val_loss_min = val_loss
 
 
 class FusionModel(bm.BaseModel):
@@ -183,9 +168,9 @@ class FusionModel(bm.BaseModel):
         if not checkpoint_files:
             return None
 
-        if "best_model" in checkpoint_files:
+        if "best_model.pt" in checkpoint_files:
             return "best_model.pt"
-
+        
         # Sort based on epoch number
         checkpoint_files.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
 
@@ -259,18 +244,18 @@ class FusionModel(bm.BaseModel):
         batch_size=1024,
     ):
         print("Loading dataset...")
-        dataset = pxds.PixelDataset(batch_size=batch_size)
+        dataset = pxds.PixelDataset(batch_size=batch_size, use_fraction=data_to_use)
         # Splitting dataset into training and validation subsets
         print("Splitting dataset into training and validation subsets...")
-        data_len = int(data_to_use * len(dataset))
+        data_len = len(dataset)
         print("Data points to use:", data_len * batch_size)
         train_size = int(train_ratio * data_len)
         print("Training data points:", train_size * batch_size)
         val_size = data_len - train_size
         print("Validation data points:", val_size * batch_size)
-        _, train_dataset, val_dataset = random_split(
+        train_dataset, val_dataset = random_split(
             dataset,
-            [len(dataset) - data_len, train_size, val_size],
+            [train_size, val_size],
             generator=torch.Generator().manual_seed(42),
         )
 
@@ -292,7 +277,6 @@ class FusionModel(bm.BaseModel):
         early_stopping = EarlyStopping(
             patience=patience,
             verbose=True,
-            path=f"best_model.pt",
         )
 
         self.net.train()
@@ -316,6 +300,7 @@ class FusionModel(bm.BaseModel):
 
             if early_stopping.early_stop:
                 print("Early stopping")
+                self.save_checkpoint(epoch, "best_model.pt")
                 break
 
             # Save checkpoint after every epoch
