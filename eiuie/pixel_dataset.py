@@ -10,7 +10,7 @@ FILE = "data/pixel_dataset.ds"
 class PixelDataset(Dataset):
     """
     PixelDataset class.
-    
+
     Attributes
     ----------
     df: pd.DataFrame
@@ -21,7 +21,7 @@ class PixelDataset(Dataset):
 
     def __init__(self):
         # Load binary data
-        with open(FILE, 'rb') as f:
+        with open(FILE, "rb") as f:
             raw_data = f.read()
 
         # Convert binary data to a numpy array of shape (num_rows, 15)

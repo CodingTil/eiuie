@@ -14,12 +14,29 @@ def prepare_dataset() -> None:
         os.remove(pxds.FILE)
     with open(pxds.FILE, "wb") as file:
         for data in generator:
-            combined = np.hstack((data["original"], data["unsharp"], data["homomorphic"], data["retinex"], data["ground_truth"]))
+            combined = np.hstack(
+                (
+                    data["original"],
+                    data["unsharp"],
+                    data["homomorphic"],
+                    data["retinex"],
+                    data["ground_truth"],
+                )
+            )
             for row in combined:
                 file.write(bytes(row))
 
 
-def __consolidate_data() -> Generator[Dict[Literal["original", "retinex", "unsharp", "homomorphic", "ground_truth"], np.ndarray], None, None]:
+def __consolidate_data() -> (
+    Generator[
+        Dict[
+            Literal["original", "retinex", "unsharp", "homomorphic", "ground_truth"],
+            np.ndarray,
+        ],
+        None,
+        None,
+    ]
+):
     # Path to intermediate images
     path_retinex = "data/intermediate_images/retinex/"
     path_unsharp = "data/intermediate_images/unsharp_masking/"
@@ -50,12 +67,14 @@ def __consolidate_data() -> Generator[Dict[Literal["original", "retinex", "unsha
         image2D_ground_truth = image_ground_truth.reshape(-1, 3)
 
         # convert to single pandas dataframe
-        data: Dict[Literal["original", "retinex", "unsharp", "homomorphic", "ground_truth"], np.ndarray] = {
+        data: Dict[
+            Literal["original", "retinex", "unsharp", "homomorphic", "ground_truth"],
+            np.ndarray,
+        ] = {
             "original": image2D_original,
             "retinex": image2D_retinex,
             "unsharp": image2D_unsharp,
             "homomorphic": image2D_homomorphic,
-            "ground_truth": image2D_ground_truth
+            "ground_truth": image2D_ground_truth,
         }
         yield data
-        
