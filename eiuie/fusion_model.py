@@ -43,9 +43,7 @@ class FusionNet(nn.Module):
 
 
 class EarlyStopping:
-    def __init__(
-        self, patience=5, verbose=False, delta=0, trace_func=print
-    ):
+    def __init__(self, patience=5, verbose=False, delta=0, trace_func=print):
         """
         Parameters
         ----------
@@ -170,7 +168,7 @@ class FusionModel(bm.BaseModel):
 
         if "best_model.pt" in checkpoint_files:
             return "best_model.pt"
-        
+
         # Sort based on epoch number
         checkpoint_files.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
 
