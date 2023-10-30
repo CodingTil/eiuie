@@ -38,6 +38,9 @@ class PixelDataset(Dataset):
 
             self.data_array[start_idx:end_idx] = np.concatenate(hsi_data_list, axis=1)
 
+        # Shuffle data_array
+        np.random.shuffle(self.data_array)
+
         self.batch_size = batch_size
 
     def __len__(self) -> int:
@@ -48,6 +51,9 @@ class PixelDataset(Dataset):
         end = start + self.batch_size
 
         batch_data = self.data_array[start:end]
+
+        # Shuffle batch_data
+        np.random.shuffle(batch_data)
 
         inputs = torch.tensor(batch_data[:, :12], dtype=torch.float32)
         outputs = torch.tensor(batch_data[:, 12:], dtype=torch.float32)

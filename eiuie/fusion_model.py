@@ -18,28 +18,42 @@ import pixel_dataset as pxds
 CHECKPOINT_DIRECTORY = "data/checkpoints"
 
 
-class FusionNet(nn.Module):
-    def __init__(self, dropout_rate=0.5):
-        super(FusionNet, self).__init__()
+class ChannelNet(nn.Module):
+    """Single layer perceptron for individual channels."""
 
-        self.model = nn.Sequential(
-            nn.Linear(12, 12),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(12, 9),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(9, 6),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(6, 3),
-            nn.ReLU(),
-            nn.Linear(3, 3),
-            nn.Sigmoid(),
-        )
+    def __init__(self, input_size=4, output_size=1):
+        super(ChannelNet, self).__init__()
+        self.fc = nn.Linear(input_size, output_size)
 
     def forward(self, x):
-        return self.model(x)
+        return self.fc(x)
+
+
+class FusionNet(nn.Module):
+    """Unifying model for all channels."""
+
+    def __init__(self):
+        super(FusionNet, self).__init__()
+        self.h_net = ChannelNet()
+        self.s_net = ChannelNet()
+        self.i_net = ChannelNet()
+
+    def forward(self, x):
+        # Flatten the middle dimensions
+        x = x.view(-1, 12)  # This will reshape the input to (batch_size, 12)
+
+        # Splitting the input for the three channels
+        h_channel = x[:, 0::3]  # Every third value starting from index 0
+        s_channel = x[:, 1::3]  # Every third value starting from index 1
+        i_channel = x[:, 2::3]  # Every third value starting from index 2
+
+        # Getting the outputs
+        h_out = self.h_net(h_channel)
+        s_out = self.s_net(s_channel)
+        i_out = self.i_net(i_channel)
+
+        # Concatenate the outputs to get the final output
+        return torch.cat((h_out, s_out, i_out), dim=1)
 
 
 class EarlyStopping:
@@ -142,7 +156,9 @@ class FusionModel(bm.BaseModel):
         )
 
     def load_checkpoint(self, checkpoint_path: str):
-        checkpoint = torch.load(f"{CHECKPOINT_DIRECTORY}/{checkpoint_path}")
+        checkpoint = torch.load(
+            f"{CHECKPOINT_DIRECTORY}/{checkpoint_path}", map_location=self.device
+        )
         self.net.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         self.start_epoch = checkpoint["epoch"]
