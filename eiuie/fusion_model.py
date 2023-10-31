@@ -157,7 +157,7 @@ class FusionModel(bm.BaseModel):
         self.device = torch.device("cuda" if cuda.is_available() else "cpu")
 
         # Neural Network Model
-        self.net = FusionNet(use_original=False).to(self.device)
+        self.net = FusionNet(use_original=True).to(self.device)
         self.optimizer = optim.Adam(self.net.parameters())
         self.criterion = nn.MSELoss()  # assuming regression task
         self.start_epoch = 0

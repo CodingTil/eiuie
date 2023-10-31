@@ -21,7 +21,15 @@ class PixelDataset(Dataset):
 
         # Use numpy's memory mapping
         raw_data_low = np.memmap(FILE_LOW, dtype=np.uint8, mode="r").reshape(-1, 15)
+        if use_fraction < 1.0:
+            n_samples = int(len(raw_data_low) * use_fraction)
+            idxs = np.random.choice(len(raw_data_low), n_samples, replace=False)
+            raw_data_low = raw_data_low[idxs]
         raw_data_high = np.memmap(FILE_HIGH, dtype=np.uint8, mode="r").reshape(-1, 15)
+        if use_fraction < 1.0:
+            n_samples = int(len(raw_data_high) * use_fraction)
+            idxs = np.random.choice(len(raw_data_high), n_samples, replace=False)
+            raw_data_high = raw_data_high[idxs]
 
         # Select exposures to use
         raw_data: np.ndarray
@@ -32,12 +40,6 @@ class PixelDataset(Dataset):
                 raw_data = raw_data_low
             case "both":
                 raw_data = np.concatenate((raw_data_low, raw_data_high), axis=0)
-
-        # Randomly select a fraction of the data if use_fraction < 1.0
-        if use_fraction < 1.0:
-            n_samples = int(len(raw_data) * use_fraction)
-            idxs = np.random.choice(len(raw_data), n_samples, replace=False)
-            raw_data = raw_data[idxs]
 
         data_array = np.zeros_like(raw_data, dtype=np.float32)
         n_rows = raw_data.shape[0]
