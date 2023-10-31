@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Literal, Tuple
 from multiprocessing import Pool, Queue, Process, Manager, cpu_count
 import glob
 import os
@@ -32,7 +32,11 @@ def write_to_file(queue: Queue) -> None:
 
 
 def process_and_enqueue(
-    models: List[bm.BaseModel], image_name: str, image_path: str, queue: Queue
+    models: List[bm.BaseModel],
+    exposure_type: Literal["high", "low"],
+    image_name: str,
+    image_path: str,
+    queue: Queue,
 ) -> None:
     """
     Process the image using the models and enqueue the result for writing.
@@ -50,14 +54,18 @@ def process_and_enqueue(
     """
     image = cv2.imread(image_path)
     for model in models:
-        print(f"Processing {image_name} with {model.name}")
+        print(f"Processing {exposure_type}/{image_name} with {model.name}")
         processed_image = model.process_image(image)
-        absolute_file_name = f"{SAVE_LOCATION}/{model.name}/{image_name}.png"
+        absolute_file_name = (
+            f"{SAVE_LOCATION}/{exposure_type}/{model.name}/{image_name}.png"
+        )
         absolute_file_name = os.path.abspath(absolute_file_name)
         queue.put((absolute_file_name, processed_image))
 
 
-def batch_process(models: List[bm.BaseModel], images: Dict[str, str]) -> None:
+def batch_process(
+    models: List[bm.BaseModel], images: Dict[Tuple[Literal["high", "low"], str], str]
+) -> None:
     """
     Batch process images using the model, and saves the results.
 
@@ -81,10 +89,10 @@ def batch_process(models: List[bm.BaseModel], images: Dict[str, str]) -> None:
         # Create a pool for parallel processing
         async_results = []  # Collect all the AsyncResult objects here
         with Pool(cpu_count() - 1) as pool:
-            for image_name, image_path in images.items():
+            for (exposure_type, image_name), image_path in images.items():
                 res = pool.apply_async(
                     process_and_enqueue,
-                    args=(models, image_name, image_path, write_queue),
+                    args=(models, exposure_type, image_name, image_path, write_queue),
                 )
                 async_results.append(res)
 
@@ -103,11 +111,14 @@ def batch_process(models: List[bm.BaseModel], images: Dict[str, str]) -> None:
 
 
 def batch_process_dataset() -> None:
-    glob_pattern = "data/lol_dataset/*/low/*.png"
+    glob_pattern = "data/lol_dataset/*/*/*.png"
     images = glob.glob(glob_pattern)
-    images_dict = {
-        image.split("/")[-1].split(".")[0]: os.path.abspath(image) for image in images
-    }
+    images_dict: Dict[Tuple[Literal["high", "low"], str], str] = {}
+    for image in images:
+        exposure_type: str = image.split("/")[-2]
+        assert exposure_type in ["high", "low"]
+        image_name = image.split("/")[-1].split(".")[0]
+        images_dict[(exposure_type, image_name)] = os.path.abspath(image)
     print(f"Found {len(images_dict)} images")
     models = [
         unsharp_masking.UnsharpMasking(),

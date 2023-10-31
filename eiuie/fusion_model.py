@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable, Any
 import os
 
 import numpy as np
@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.cuda as cuda
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import DataLoader, random_split
+from torch.utils.data.sampler import BatchSampler, RandomSampler
 
 import base_model as bm
 import unsharp_masking as um
@@ -21,9 +22,9 @@ CHECKPOINT_DIRECTORY = "data/checkpoints"
 class ChannelNet(nn.Module):
     """Single layer perceptron for individual channels."""
 
-    def __init__(self, input_size=4, output_size=1):
+    def __init__(self, input_size: int):
         super(ChannelNet, self).__init__()
-        self.fc = nn.Linear(input_size, output_size)
+        self.fc = nn.Linear(input_size, 1)
 
     def forward(self, x):
         return self.fc(x)
@@ -32,20 +33,29 @@ class ChannelNet(nn.Module):
 class FusionNet(nn.Module):
     """Unifying model for all channels."""
 
-    def __init__(self):
+    use_original: bool
+
+    def __init__(self, use_original: bool):
         super(FusionNet, self).__init__()
-        self.h_net = ChannelNet()
-        self.s_net = ChannelNet()
-        self.i_net = ChannelNet()
+        self.use_original = use_original
+        self.h_net = ChannelNet(4 if use_original else 3)
+        self.s_net = ChannelNet(4 if use_original else 3)
+        self.i_net = ChannelNet(4 if use_original else 3)
 
     def forward(self, x):
         # Flatten the middle dimensions
         x = x.view(-1, 12)  # This will reshape the input to (batch_size, 12)
 
         # Splitting the input for the three channels
-        h_channel = x[:, 0::3]  # Every third value starting from index 0
-        s_channel = x[:, 1::3]  # Every third value starting from index 1
-        i_channel = x[:, 2::3]  # Every third value starting from index 2
+        h_channel = x[
+            :, 0 if self.use_original else 3 :: 3
+        ]  # Every third value starting from index 0
+        s_channel = x[
+            :, 1 if self.use_original else 4 :: 3
+        ]  # Every third value starting from index 1
+        i_channel = x[
+            :, 2 if self.use_original else 5 :: 3
+        ]  # Every third value starting from index 2
 
         # Getting the outputs
         h_out = self.h_net(h_channel)
@@ -57,7 +67,24 @@ class FusionNet(nn.Module):
 
 
 class EarlyStopping:
-    def __init__(self, patience=5, verbose=False, delta=0, trace_func=print):
+    """Early stops the training if validation loss doesn't improve after a given patience."""
+
+    patience: int
+    verbose: bool
+    counter: int
+    best_score: Optional[float]
+    early_stop: bool
+    val_loss_min: float
+    delta: float
+    trace_func: Callable[[Any], None]
+
+    def __init__(
+        self,
+        patience: int = 5,
+        verbose: bool = False,
+        delta: float = 0.0,
+        trace_func: Callable[[Any], None] = print,
+    ):
         """
         Parameters
         ----------
@@ -79,7 +106,7 @@ class EarlyStopping:
         self.delta = delta
         self.trace_func = trace_func
 
-    def __call__(self, val_loss, model):
+    def __call__(self, val_loss: float):
         score = -val_loss
 
         if self.best_score is None:
@@ -130,7 +157,7 @@ class FusionModel(bm.BaseModel):
         self.device = torch.device("cuda" if cuda.is_available() else "cpu")
 
         # Neural Network Model
-        self.net = FusionNet().to(self.device)
+        self.net = FusionNet(use_original=False).to(self.device)
         self.optimizer = optim.Adam(self.net.parameters())
         self.criterion = nn.MSELoss()  # assuming regression task
         self.start_epoch = 0
@@ -258,15 +285,15 @@ class FusionModel(bm.BaseModel):
         batch_size=1024,
     ):
         print("Loading dataset...")
-        dataset = pxds.PixelDataset(batch_size=batch_size, use_fraction=data_to_use)
+        dataset = pxds.PixelDataset(use_fraction=data_to_use, use_exposures="both")
         # Splitting dataset into training and validation subsets
         print("Splitting dataset into training and validation subsets...")
         data_len = len(dataset)
-        print("Data points to use:", data_len * batch_size)
+        print("Data points to use:", data_len)
         train_size = int(train_ratio * data_len)
-        print("Training data points:", train_size * batch_size)
+        print("Training data points:", train_size)
         val_size = data_len - train_size
-        print("Validation data points:", val_size * batch_size)
+        print("Validation data points:", val_size)
         train_dataset, val_dataset = random_split(
             dataset,
             [train_size, val_size],
@@ -275,15 +302,17 @@ class FusionModel(bm.BaseModel):
 
         train_loader = DataLoader(
             train_dataset,
-            batch_size=1,
-            shuffle=False,
+            batch_sampler=BatchSampler(
+                RandomSampler(train_dataset), batch_size=batch_size, drop_last=False
+            ),
             num_workers=0,
             pin_memory=True,
         )
         val_loader = DataLoader(
             val_dataset,
-            batch_size=1,
-            shuffle=False,
+            batch_sampler=BatchSampler(
+                RandomSampler(val_dataset), batch_size=batch_size, drop_last=False
+            ),
             num_workers=0,
             pin_memory=True,
         )
@@ -292,6 +321,8 @@ class FusionModel(bm.BaseModel):
             patience=patience,
             verbose=True,
         )
+
+        best_val_loss = float("inf")
 
         self.net.train()
         for epoch in range(self.start_epoch, total_epochs):
@@ -309,12 +340,16 @@ class FusionModel(bm.BaseModel):
             val_loss = self.validate(val_loader)
             print(f"Validation loss: {val_loss}")
 
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                print("Saving best model...")
+                self.save_checkpoint(epoch, "best_model.pt")
+
             print("Checking early stopping...")
-            early_stopping(val_loss, self.net)
+            early_stopping(val_loss)
 
             if early_stopping.early_stop:
                 print("Early stopping")
-                self.save_checkpoint(epoch, "best_model.pt")
                 break
 
             # Save checkpoint after every epoch
