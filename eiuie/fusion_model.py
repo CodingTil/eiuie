@@ -278,14 +278,22 @@ class FusionModel(bm.BaseModel):
 
     def train_model(
         self,
-        total_epochs=50,
-        patience=5,
-        data_to_use=0.005,
-        train_ratio=0.8,
-        batch_size=1024,
+        total_epochs: int = 50,
+        patience: int = 5,
+        data_to_use: float = 0.005,
+        train_ratio: float = 0.8,
+        batch_size: int = 1024,
+        pre_shuffle: bool = False,
+        shuffle: bool = True,
     ):
         print("Loading dataset...")
-        dataset = pxds.PixelDataset(use_fraction=data_to_use, use_exposures="both")
+        dataset = pxds.PixelDataset(
+            use_fraction=data_to_use,
+            use_exposures="both",
+            batch_size=batch_size,
+            pre_shuffle=pre_shuffle,
+            shuffle_batch=shuffle,
+        )
         # Splitting dataset into training and validation subsets
         print("Splitting dataset into training and validation subsets...")
         data_len = len(dataset)
@@ -302,17 +310,18 @@ class FusionModel(bm.BaseModel):
 
         train_loader = DataLoader(
             train_dataset,
-            batch_sampler=BatchSampler(
-                RandomSampler(train_dataset), batch_size=batch_size, drop_last=False
-            ),
+            batch_size=1,
+            shuffle=shuffle,
+            collate_fn=lambda x: x[0],
             num_workers=0,
             pin_memory=True,
         )
+
         val_loader = DataLoader(
             val_dataset,
-            batch_sampler=BatchSampler(
-                RandomSampler(val_dataset), batch_size=batch_size, drop_last=False
-            ),
+            batch_size=1,
+            shuffle=False,
+            collate_fn=lambda x: x[0],
             num_workers=0,
             pin_memory=True,
         )
