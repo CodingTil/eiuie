@@ -157,7 +157,7 @@ class FusionModel(bm.BaseModel):
         self.device = torch.device("cuda" if cuda.is_available() else "cpu")
 
         # Neural Network Model
-        self.net = FusionNet(use_original=True).to(self.device)
+        self.net = FusionNet(use_original=False).to(self.device)
         self.optimizer = optim.Adam(self.net.parameters())
         self.criterion = nn.MSELoss()  # assuming regression task
         self.start_epoch = 0
@@ -269,6 +269,9 @@ class FusionModel(bm.BaseModel):
 
         # Model inference
         outputs = self.net(all_inputs).cpu().detach().numpy()
+
+        # All values between 0 and 1
+        outputs = np.clip(outputs, 0, 1)
 
         # Reshape outputs back to the original image shape
         fused_image = outputs.reshape(dimensions[0], dimensions[1], 3)

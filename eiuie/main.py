@@ -5,6 +5,7 @@ import cv2
 import batch_process as bp
 import base_model as bm
 import consolidate_dataset as cd
+import eval
 import unsharp_masking
 import retinex
 import homomorphic_filtering
@@ -17,7 +18,7 @@ def main():
     parser.add_argument(
         "command",
         type=str,
-        choices=["single", "batch_process", "prepare_dataset", "train"],
+        choices=["single", "batch_process", "prepare_dataset", "train", "eval"],
         help="Command to run",
     )
 
@@ -66,6 +67,8 @@ def main():
         case "train":
             method = fusion_model.FusionModel()
             method.train_model()
+        case "eval":
+            eval.batch_evaluate()
         case _:
             raise ValueError(f"Unknown command: {args.command}")
 

@@ -2,4 +2,6 @@ lol_dataset/
 intermediate_images/
 pixel_dataset/
 checkpoints/
+eval_dataset/*
+!eval_dataset/input/
 
