@@ -7,26 +7,26 @@ import base_model as bm
 class HomomorphicFiltering(bm.BaseModel):
     """Homomorphic Filtering"""
 
-    ksize: int
-    sigma: float
     gamma_1: float
     gamma_2: float
     rho: float
 
-    def __init__(self, ksize: int = 3, sigma: float = 1.0):
+    def __init__(
+        self, gamma_high: float = 1.0, gamma_low: float = 0.4, rho: float = 2.0
+    ):
         """
         Parameters
         ----------
-        ksize : int, optional
-            Kernel size, by default 3
-        sigma : float, optional
-            Gaussian kernel standard deviation, by default 1.0
+        gamma_high : float, optional
+            High gamma value, by default 1.0
+        gamma_low : float, optional
+            Low gamma value, by default 0.4
+        rho : float, optional
+            Rho value, by default 2.0
         """
-        self.ksize = ksize
-        self.sigma = sigma
-        self.gamma_1 = 0.8
-        self.gamma_2 = 1.8
-        self.rho = 100.0
+        self.gamma_1 = gamma_high
+        self.gamma_2 = gamma_high - gamma_low
+        self.rho = rho
 
     @property
     def name(self) -> str:
@@ -67,11 +67,21 @@ class HomomorphicFiltering(bm.BaseModel):
             for j in range(i_log_fft_shifted.shape[1]):
                 i_log_fft_shifted_filtered[i, j] = i_log_fft_shifted[
                     i, j
-                ] * self.filter(np.sqrt(i**2 + j**2))
+                ] * self.filter(
+                    np.sqrt(
+                        (i - i_log_fft_shifted.shape[0] / 2) ** 2
+                        + (j - i_log_fft_shifted.shape[1] / 2) ** 2
+                    )
+                )
         i_log_filtered = np.real(
             np.fft.ifft2(np.fft.ifftshift(i_log_fft_shifted_filtered))
         )
         i_filtered = np.exp2(i_log_filtered) - 1.0
+        # between 0 and 1
+        if np.max(i_filtered) > 1.0 or np.min(i_filtered) < 0.0:
+            i_filtered = (i_filtered - np.min(i_filtered)) / (
+                np.max(i_filtered) - np.min(i_filtered)
+            )
         hsi_filtered = hsi.copy()
         hsi_filtered[:, :, 2] = i_filtered
         return hsi_filtered

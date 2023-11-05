@@ -81,7 +81,7 @@
 \section{Introduction}\label{sec:intro}
 
 \section{Theory}\label{sec:theory}
-In this section we will dive into different methods to enhance images with uneven illumination. We will start with a brief introduction to the problem and then discuss different methods to solve it. We will also discuss the advantages and disadvantages of each method, and from this conclude particular use cases where they might be helpful.
+In this section we will dive into different methods to enhance images with uneven illumination. We will start with a brief introduction to the problem and then discuss different methods to solve it, as well as how to evaluate the results.
 
 \subsection{Problem description}\label{sec:problem}
 Uneven illumination refers to the irregular distribution of light intensity across an image. In essence, it disrupts the uniformity of the visual output, leading to disparities in brightness and contrast, often observable as glares or shadows. These disparities can mask essential features and details, making the subject of the image less identifiable. This becomes especially problematic when images need to be processed further for various computer vision tasks. In fields like optical microscopy, for example, consistent illumination is crucial for accurately identifying and segmenting microscopic entities. Uneven lighting can obscure crucial cellular structures or make similar-looking entities appear distinct, hampering accurate analysis \cite{dey2019uneven}.
@@ -89,6 +89,11 @@ Uneven illumination refers to the irregular distribution of light intensity acro
 To counter this issue, the goal is to enhance the image in a manner that simulates its capture under uniform illumination conditions. By doing so, we aim to restore a natural appearance to the image, preserving details and minimizing artifacts introduced by uneven lighting. This correction enables better analysis, ensuring that conclusions drawn are based on the actual subject and not on lighting imperfections \cite{dey2019uneven}.
 
 \subsection{Unsharp Masking}\label{sec:unsharp}
+Unsharp masking is a sharpening technique that uses a blurred version of the original image to enhance edges and fine details. The name stems from the fact that the blurred image is subtracted from the original, leaving only the high-frequency components, which are then added back to the original image. This results into an image with sharper edges, more pronounced detail, and more contrast. This approach can be formulated as follows \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}:
+\begin{equation}
+	g(x,y) = f(x,y) + \lambda \cdot (f(x,y) - Blur(f)(x,y))
+\end{equation}
+where $f(x,y)$ is the input image, $Blur(f)(x,y)$ is the blurred input image, and $\lambda > 0$ is a parameter that controls the strength of the sharpening effect. Typically, a Gaussian filter is used to blur the input image \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}.
 
 \subsection{Retinex}\label{sec:retinex}
 
@@ -139,7 +144,7 @@ Many approaches to the linear filter $H(u,v)$ exist. Voicu et al. propose to use
 	H(u, v) = H'(\rho) = \gamma_1  - \gamma_2 \cdot \frac{1}{1 + 2.415 \cdot \left(\frac{\rho}{\rho_c}\right)^{4}},\\
 	\text{where} \qquad \rho = \sqrt{u^2 + v^2}
 \end{align}
-where $\gamma_1, \gamma_2, \rho_c$ are parameters that can be tuned to achieve the desired effect. The resulting filter has the general form shown in Figure \ref{fig:homomorphic-filter} \cite{voicu1997practical}.
+where $\gamma_H, \gamma_L, \rho_c$ are parameters that can be tuned to achieve the desired effect, and $\gamma_1 \approx \gamma_H, \gamma_2 \approx \gamma_H - \gamma_L$ \cite{voicu1997practical}. The resulting filter has the general form shown in Figure \ref{fig:homomorphic-filter}.
 
 \begin{figure}
 	\centering
@@ -148,7 +153,25 @@ where $\gamma_1, \gamma_2, \rho_c$ are parameters that can be tuned to achieve t
 	\label{fig:homomorphic-filter}
 \end{figure}
 
-Finally, Fan et al. \cite{fan2011homomorphic} propose  to append a histogram equalization step to the homomorphic filtering pipeline, in order to improve the contrast of the image. An implementation of this approach is shown in Listing \ref{lst:homomorphic}.
+Finally, Fan et al. \cite{fan2011homomorphic} propose  to append a histogram equalization step to the homomorphic filtering pipeline, in order to improve the contrast of the image.
+
+In order to enhance colored images using homomorphic filtering, this pipeline can be applied to a single channel, e.g. the illumination channel of HSI images, or all channels, as in RGB images. \cite{voicu1997practical,fan2011homomorphic}. An implementation of this approach is shown in Listing \ref{lst:homomorphic}.
+
+\subsection{Evaluation of Enhancement}\label{sec:evaluation}
+The quality of the enhancement can be evaluated in a few different ways. If the image was enhanced simply to improve its visual appearance, visual inspection often suffices. On the other hand, if the image was enhanced as a preprocessing step for some other computer vision task such as segmentation, the quality of the enhancement should be evaluated by measuring the performance of the computer vision task on the enhanced image. However, there are also some objective metrics that can be used to get an idea of how well an image has been enhanced:
+
+\subsubsection{RMS Contrast}\label{sec:rms-contrast}
+Contrast is a measure of the difference in brightness between the darkest and brightest parts of an image, i.e. it is a measure of how well objects are distinguishable. After enhancing an image with uneven illumination, we hope to increase the contrast in the areas of the image that originally had the same illumination. Therefore, an enhanced image might not experience a global increase in contrast, and rather some local increases. The RMS contrast is defined as the variance of the pixel intensities across the entire image \cite{dey2019uneven}:
+\begin{equation}
+	\text{RMS Contrast} = \frac{1}{N \cdot M} \sum_{i=1}^{N} \sum_{j=1}^{M} (I(i,j) - \bar{I})^2
+\end{equation}
+
+\subsubsection{Discrete Entropy}\label{sec:discrete-entropy}
+Entropy describes the amount of information in an image, where a high entropy means that the image contains a lot of information, and a low entropy means that the image contains little information, i.e. a flat image has zero entropy. Enhancing an image with uneven illumination should increase the amount of information in the image, and therefore increase the entropy. The discrete entropy is defined as \cite{dey2019uneven,ye2007discrete}:
+\begin{equation}
+	\text{Discrete Entropy} = - \sum_{i} P_i \cdot \log_2(P_i)
+\end{equation}
+where $P_i$ is the probability that the difference between two adjacent pixels is $i$.
 
 
 \section{Methodology}\label{sec:method}
@@ -161,13 +184,6 @@ Finally, Fan et al. \cite{fan2011homomorphic} propose  to append a histogram equ
 
 %%
 %% If your work has an appendix, this is the place to put it.
-\appendix
-
-\section{Listings}
-\subsection{Homomorphic Filtering}\label{sec:homomorphic-listing}
-\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
-\lstinputlisting[language=Python, caption=Homomorphic filtering, label=lst:homomorphic]{listings/homomorphic_filtering.py}
-\end{mdframed}
 
 
 %%
@@ -178,6 +194,17 @@ Finally, Fan et al. \cite{fan2011homomorphic} propose  to append a histogram equ
 
 \newpage
 \appendix
+
+\section{Listings}
+\subsection{Unsharp Masking}\label{sec:unsharp-listing}
+\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
+\lstinputlisting[language=Python, caption=Unsharp masking,label=lst:unsharp]{listings/unsharp_masking.py}
+\end{mdframed}
+
+\subsection{Homomorphic Filtering}\label{sec:homomorphic-listing}
+\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
+\lstinputlisting[language=Python, caption=Homomorphic filtering, label=lst:homomorphic]{listings/homomorphic_filtering.py}
+\end{mdframed}
 
 \end{document}
 \endinput

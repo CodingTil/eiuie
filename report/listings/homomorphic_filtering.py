@@ -3,7 +3,7 @@ import cv2
 from util import BGR2HSI, HSI2BGR
 
 
-def filter(value, gamma_1: float, gamma_2: float, rho: float):
+def filter(value, gamma_1: float = 1.0, gamma_2: float = 0.6, rho: float = 2.0):
     return gamma_1 - gamma_2 * (1 / (1 + 2.415 * np.power(value / rho, 4)))
 
 
@@ -33,7 +33,10 @@ def process_image(image: np.ndarray) -> np.ndarray:
     for i in range(i_log_fft_shifted.shape[0]):
         for j in range(i_log_fft_shifted.shape[1]):
             i_log_fft_shifted_filtered[i, j] = i_log_fft_shifted[i, j] * filter(
-                np.sqrt(i**2 + j**2)
+                np.sqrt(
+                    (i - i_log_fft_shifted.shape[0] / 2) ** 2
+                    + (j - i_log_fft_shifted.shape[1] / 2) ** 2
+                )
             )
     i_log_filtered = np.real(np.fft.ifft2(np.fft.ifftshift(i_log_fft_shifted_filtered)))
     i_filtered = np.exp2(i_log_filtered) - 1.0

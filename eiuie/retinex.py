@@ -1,21 +1,58 @@
+"""
+Parts of this file are adapted from https://santhalakshminarayana.github.io/blog/retinex-image-enhancement
+"""
+
+from typing import Optional, List
+
 import numpy as np
 import cv2
 
 import base_model as bm
 
 
-def get_ksize(sigma):
+def get_ksize(sigma: float) -> int:
+    """
+    Compute kernel size from sigma
+
+    Parameters
+    ----------
+    sigma : float
+        sigma value of gaussian kernel
+
+    Returns
+    -------
+    int
+        kernel size
+    """
     # opencv calculates ksize from sigma as
     # sigma = 0.3*((ksize-1)*0.5 - 1) + 0.8
     # then ksize from sigma is
     # ksize = ((sigma - 0.8)/0.15) + 2.0
-
     return int(((sigma - 0.8) / 0.15) + 2.0)
 
 
-def get_gaussian_blur(img, ksize=0, sigma=5):
+def get_gaussian_blur(
+    img: np.ndarray, ksize: Optional[int] = None, sigma: float = 5.0
+) -> np.ndarray:
+    """
+    Apply gaussian blur to image
+
+    Parameters
+    ----------
+    img : np.ndarray
+        image to apply gaussian blur
+    ksize : Optional[int], optional
+        kernel size, by default None
+    sigma : float, optional
+        sigma value of gaussian kernel, by default 5.0
+
+    Returns
+    -------
+    np.ndarray
+        gaussian blurred image
+    """
     # if ksize == 0, then compute ksize from sigma
-    if ksize == 0:
+    if ksize is None:
         ksize = get_ksize(sigma)
 
     # Gaussian 2D-kernel can be seperable into 2-orthogonal vectors
@@ -26,15 +63,44 @@ def get_gaussian_blur(img, ksize=0, sigma=5):
     return cv2.filter2D(img, -1, np.outer(sep_k, sep_k))
 
 
-def ssr(img, sigma):
+def ssr(img: np.ndarray, sigma: float) -> np.ndarray:
+    """
+    Single-scale retinex of an image
+
+    Parameters
+    ----------
+    img : np.ndarray
+        image to apply single-scale retinex
+    sigma : float
+        sigma value of gaussian kernel
+
+    Returns
+    -------
+    np.ndarray
+        single-scale retinex image
+    """
     # Single-scale retinex of an image
     # SSR(x, y) = log(I(x, y)) - log(I(x, y)*F(x, y))
     # F = surrounding function, here Gaussian
-
     return np.log10(img) - np.log10(get_gaussian_blur(img, ksize=0, sigma=sigma) + 1.0)
 
 
-def msr(img, sigma_scales=[15, 80, 250]):
+def msr(img: np.ndarray, sigma_scales: List[float] = [15, 80, 250]) -> np.ndarray:
+    """
+    Multi-scale retinex of an image
+
+    Parameters
+    ----------
+    img : np.ndarray
+        image to apply multi-scale retinex
+    sigma_scales : List[float], optional
+        list of sigma values of gaussian kernel, by default [15, 80, 250]
+
+    Returns
+    -------
+    np.ndarray
+        multi-scale retinex image
+    """
     # Multi-scale retinex of an image
     # MSR(x,y) = sum(weight[i]*SSR(x,y, scale[i])), i = {1..n} scales
 
@@ -54,8 +120,24 @@ def msr(img, sigma_scales=[15, 80, 250]):
     return msr
 
 
-def color_balance(img, low_per, high_per):
-    """Contrast stretch img by histogram equilization with black and white cap"""
+def color_balance(img: np.ndarray, low_per: float, high_per: float) -> np.ndarray:
+    """
+    Color balance an image, by applying contrast-stretching using histogram equalization with black and white cap
+
+    Parameters
+    ----------
+    img : np.ndarray
+        image to apply color balance
+    low_per : float
+        percentage of pixels to black-out
+    high_per : float
+        percentage of pixels to white-out
+
+    Returns
+    -------
+    np.ndarray
+        color balanced image
+    """
 
     tot_pix = img.shape[1] * img.shape[0]
     # no.of pixels to black-out and white-out
@@ -97,40 +179,34 @@ def color_balance(img, low_per, high_per):
         return np.squeeze(cs_img)
     elif len(cs_img) > 1:
         return cv2.merge(cs_img)
-    return None
+    raise Exception("Color balance failed")
 
 
-def msrcr(
-    img,
-    sigma_scales=[15, 80, 250],
-    alpha=125,
-    beta=46,
-    G=192,
-    b=-30,
-    low_per=1,
-    high_per=1,
-):
-    # Multi-scale retinex with Color Restoration
-    # MSRCR(x,y) = G * [MSR(x,y)*CRF(x,y) - b], G=gain and b=offset
-    # CRF(x,y) = beta*[log(alpha*I(x,y) - log(I'(x,y))]
-    # I'(x,y) = sum(Ic(x,y)), c={0...k-1}, k=no.of channels
+def msrcp(
+    img: np.ndarray,
+    sigma_scales: List[float] = [15, 80, 250],
+    low_per: float = 1,
+    high_per: float = 1,
+) -> np.ndarray:
+    """
+    Multi-scale retinex with color preservation of an image
 
-    img = img.astype(np.float64) + 1.0
-    # Multi-scale retinex and don't normalize the output
-    msr_img = msr(img, sigma_scales, apply_normalization=False)
-    # Color-restoration function
-    crf = beta * (np.log10(alpha * img) - np.log10(np.sum(img, axis=2, keepdims=True)))
-    # MSRCR
-    msrcr = G * (msr_img * crf - b)
-    # normalize MSRCR
-    msrcr = cv2.normalize(msrcr, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC3)
-    # color balance the final MSRCR to flat the histogram distribution with tails on both sides
-    msrcr = color_balance(msrcr, low_per, high_per)
+    Parameters
+    ----------
+    img : np.ndarray
+        image to apply multi-scale retinex with color preservation
+    sigma_scales : List[float], optional
+        list of sigma values of gaussian kernel, by default [15, 80, 250]
+    low_per : float, optional
+        percentage of pixels to black-out, by default 1
+    high_per : float, optional
+        percentage of pixels to white-out, by default 1
 
-    return msrcr
-
-
-def msrcp(img, sigma_scales=[15, 80, 250], low_per=1, high_per=1):
+    Returns
+    -------
+    np.ndarray
+        multi-scale retinex with color preservation image
+    """
     # Multi-scale retinex with Color Preservation
     # Int(x,y) = sum(Ic(x,y))/3, c={0...k-1}, k=no.of channels
     # MSR_Int(x,y) = MSR(Int(x,y)), and apply color balance
