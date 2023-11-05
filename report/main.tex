@@ -96,6 +96,15 @@ Unsharp masking is a sharpening technique that uses a blurred version of the ori
 where $f(x,y)$ is the input image, $Blur(f)(x,y)$ is the blurred input image, and $\lambda > 0$ is a parameter that controls the strength of the sharpening effect. Typically, a Gaussian filter is used to blur the input image \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}.
 
 \subsection{Retinex}\label{sec:retinex}
+From a theoretical research field, known as Retinex, which concerns itself with modelling the human visual system, a number of algorithms to enhance the visual appearance of images have appeared. One of these is called Multi Scale Retinex with Chromacity Preservation (MSRCP), which is an extension to the Multi Scale Retinex (MSR) algorithm, that builds on top of the Single Scale Retinex (SSR) algorithm. The SSR algorithm is characterized by the following formula \cite{petro2014multiscale,barnard1998investigations}:
+\begin{equation}
+	\text{R}_{n_i}(x,y) = \log(f_i(x,y)) - \log(f_i(x,y) \ast F_n(x,y))
+\end{equation}
+where $f_i(x,y)$ is the value of the input image at pixel $(x,y)$ in channel $i$, and $F_c(x,y)$ is a Gaussian surround function with a $\sigma = n$. Building on top of SSR, the MSR algorithm is given by \cite{petro2014multiscale,barnard1998investigations}:
+\begin{equation}
+	\text{R}_{MSR_i}(x,y) = \sum_{n=1}^{N} \omega_n \cdot \text{R}_{n_i}(x,y)
+\end{equation}
+i.e. MSR is the weighted average of SSR at different scales. Experiments have shown that MSR alone often washes out the color of the image, and therefore the MSRCP algorithm was proposed, which first computes an intermediate image using MSR, and then stretches the colors of that image to use the full color range \cite{petro2014multiscale}. Finally, using both the original image and the intermediate image with color stretching, amplification factors are computed and applied to the original image to enhance it \cite{petro2014multiscale}. An implementation of this approach is shown in Listing \ref{lst:retinex}.
 
 \subsection{Homomorphic Filtering}\label{sec:homomorphic}
 The intensity of an image at pixel $(x,y)$ can be described as the product of the illumination $i(x,y)$ and the reflectance $r(x,y)$ \cite{voicu1997practical,fan2011homomorphic}:
@@ -176,6 +185,7 @@ where $P_i$ is the probability that the difference between two adjacent pixels i
 
 \section{Methodology}\label{sec:method}
 
+
 \section{Results}\label{sec:results}
 
 
@@ -199,6 +209,11 @@ where $P_i$ is the probability that the difference between two adjacent pixels i
 \subsection{Unsharp Masking}\label{sec:unsharp-listing}
 \begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
 \lstinputlisting[language=Python, caption=Unsharp masking,label=lst:unsharp]{listings/unsharp_masking.py}
+\end{mdframed}
+
+\subsection{Retinex}\label{sec:retinex-listing}
+\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
+\lstinputlisting[language=Python, caption=Retinex,label=lst:retinex]{listings/retinex.py}
 \end{mdframed}
 
 \subsection{Homomorphic Filtering}\label{sec:homomorphic-listing}
