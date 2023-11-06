@@ -8,19 +8,6 @@ def filter(value, gamma_1: float = 1.0, gamma_2: float = 0.6, rho: float = 2.0):
 
 
 def process_image(image: np.ndarray) -> np.ndarray:
-    """
-    Process image using the model.
-
-    Parameters
-    ----------
-    image : np.ndarray
-        Image to be processed, as BGR.
-
-    Returns
-    -------
-    np.ndarray
-        Processed image, as BGR.
-    """
     # Convert image to HSI space
     image = image.astype(np.float32)
     hsi = BGR2HSI(image)
