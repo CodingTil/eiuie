@@ -11,8 +11,12 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage[framemethod=tikz]{mdframed}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
+\usepackage{caption}
 \usepackage{tikz}
-\usetikzlibrary{shapes,arrows}
+\usetikzlibrary{shapes,arrows,arrows.meta}
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -144,7 +148,7 @@ This process is illustrated in Figure \ref{fig:homomorphic-pipeline}.
 		\draw[->] (op4) -- (op5);
 		\draw[->] (op5) -- (output);
 	\end{tikzpicture}
-	\caption{Homomorphic filtering pipeline.}
+	\captionof{figure}{Homomorphic filtering pipeline.}
 	\label{fig:homomorphic-pipeline}
 \end{figure}
 
@@ -158,7 +162,7 @@ where $\gamma_H, \gamma_L, \rho_c$ are parameters that can be tuned to achieve t
 \begin{figure}
 	\centering
 	\includegraphics[width=0.45\textwidth]{images/filter.png}
-	\caption{General form of the filter used in homomorphic filtering \cite{voicu1997practical}.}
+	\captionof{figure}{General form of the filter used in homomorphic filtering \cite{voicu1997practical}.}
 	\label{fig:homomorphic-filter}
 \end{figure}
 
@@ -184,12 +188,96 @@ where $P_i$ is the probability that the difference between two adjacent pixels i
 
 
 \section{Methodology}\label{sec:method}
+In this paper we will explore the approach of stacking the three previously introduced enhancement methods into an ensemble. To do so, we utilize three separate perceptron networks, one for each color channel, in order to fuse the intermediate images produced by unsharp masking, retinex, and homomorphic filtering in pixel-wise fashion. In the following, we will describe our proposed method in detail, as well as how we trained its parameters.
 
+\subsection{Fusion Network}\label{sec:fusion}
+We investigate the stacking of unsharp masking (UM), retinex (RTX), and homomorphic filtering (HF), see Sections \ref{sec:unsharp}, \ref{sec:retinex}, and \ref{sec:homomorphic} respectively, using a simple fusion network. In particular, our pipeline undergoes the following stages: First, each of the methods will produce an intermediate enhanced image, which we will henceforth denote as $g_{UM}$, $g_{RTX}$, and $g_{HF}$. Afterwards, we will feed these images into a fusion network, to produce the final enhanced image $g_{F}$.
+
+\begin{algorithm}
+	\caption{Fusion Network}\label{alg:fusion}
+	\begin{algorithmic}
+	\Require $g_{UM}$, $g_{RTX}$, $g_{HF}$ in HSI color space
+	\Require $w_{c} \in \mathbb{R}^3$ for $c \in \{hsi\}$
+	\Ensure $N \coloneqq \text{width}(g_{UM}) = \text{width}(g_{RTX}) = \text{width}(g_{HF})$
+	\Ensure $M \coloneqq \text{height}(g_{UM}) = \text{height}(g_{RTX}) = \text{height}(g_{HF})$
+	\State $g_{F} \gets 0^{N \times M \times 3}$
+	\For{$c \in \{hsi\}$}
+		\For{$(x,y) \in \{1, \dots, N\} \times \{1, \dots, M\}$}
+			\State $g_{F}(x,y,c) \gets w_{c_1} \cdot g_{UM}(x,y,c)$
+			\State \qquad \qquad \qquad  $+ w_{c_2} \cdot g_{RTX}(x,y,c)$
+			\State \qquad \qquad \qquad $+ w_{c_3} \cdot g_{HF}(x,y,c)$
+		\EndFor
+	\EndFor
+	\State \Return $g_{F}$
+	\end{algorithmic}
+	\end{algorithm}
+
+This fusion network consists of three separate perceptron networks, one for each of the three channels in the HSI color space. Each of these perceptrons has only three input nodes: The channel $c \in \{hsi\}$ of pixel $(x,y)$ in $g_{UM}$, $g_{RTX}$, and $g_{HF}$. The output of each perceptron is the corresponding channel of pixel $(x,y)$ in $g_{F}$. Therefore, the fusion can be described as Algorithm \ref{alg:fusion}. Here, $w_{c} \in \mathbb{R}^3$ for $c \in \{hsi\}$ are the parameters of the fusion network, which describe to what extent the intermediate images should be weighted. These parameters are learned during training, see Section \ref{sec:training}. Bias was not utilized in our experiments. The entire pipeline is also outlined in Figure \ref{fig:fusion-pipeline}.
+
+\begin{figure}
+	\centering
+	\begin{tikzpicture}[node distance=2cm, auto]
+		% Define the style for the operation nodes
+		\tikzstyle{operation}=[rectangle, draw=black, minimum size=0.8cm, text centered]
+
+		% Define nodes
+		\node (input) {$f$};
+		\node (RTX) [operation, right of=input] {RTX};
+		\node (UM) [operation, above of=RTX] {UM};
+		\node (HF) [operation, below of=RTX] {HF};
+		\node (g_UM) [right of=UM] {$g_{UM}$};
+		\node (g_RTX) [right of=RTX] {$g_{RTX}$};
+		\node (g_HF) [right of=HF] {$g_{HF}$};
+		\node (H) [operation, right of=g_UM] {$\text{fusion}_h$};
+		\node (S) [operation, right of=g_RTX] {$\text{fusion}_s$};
+		\node (I) [operation, right of=g_HF] {$\text{fusion}_i$};
+		\node (output) [right of=S] {$g_F$};
+
+		% Define edges
+		\draw[->] (input) -- (UM);
+		\draw[->] (input) -- (RTX);
+		\draw[->] (input) -- (HF);
+
+		\draw[->] (UM) -- (g_UM);
+		\draw[->] (RTX) -- (g_RTX);
+		\draw[->] (HF) -- (g_HF);
+
+		\draw[red,thick,arrows = {->}] (g_UM) -- (H);
+		\draw[red,thick,arrows = {->}] (g_RTX) -- (H);
+		\draw[red,thick,arrows = {->}] (g_HF) -- (H);
+		\draw[green,thick,arrows = {->}, dashed] (g_UM) -- (S);
+		\draw[green,thick,arrows = {->}, dashed] (g_RTX) -- (S);
+		\draw[green,thick,arrows = {->}, dashed] (g_HF) -- (S);
+		\draw[blue,thick,arrows = {->}, dotted] (g_UM) -- (I);
+		\draw[blue,thick,arrows = {->}, dotted] (g_RTX) -- (I);
+		\draw[blue,thick,arrows = {->}, dotted] (g_HF) -- (I);
+
+		\draw[red,thick,arrows = {->}] (H) -- (output);
+		\draw[green,thick,arrows = {->}, dashed] (S) -- (output);
+		\draw[blue,thick,arrows = {->}, dotted] (I) -- (output);
+	\end{tikzpicture}
+	\captionof{figure}{Pipeline of the fusion network approach. Red solid arrows symbolize the fusion of the hue channel, green dashed arrows symbolize the fusion of the saturation channel, and blue dotted arrows symbolize the fusion of the intensity channel.}
+	\label{fig:fusion-pipeline}
+\end{figure}
+
+\subsection{Implementation}\label{sec:implementation}
+We utilized the \texttt{PyTorch}\footnote{URL: \url{https://pytorch.org/}} machine learning framework to implement the fusion network approach described in Section \ref{sec:fusion} by using three separate linear fully connected layers for each of the three color channels. A simplified implementation of the fusion network is shown in Listing \ref{lst:fusion}, while the theory and implementation of the unsharp masking, retinex, and homomorphic filtering methods is explained in Sections ref{sec:unsharp}, \ref{sec:retinex}, and \ref{sec:homomorphic} and presented in Listings \ref{lst:unsharp}, \ref{lst:retinex}, and \ref{lst:homomorphic} respectively. The full codebase of this report has been made available on GitHub\footnote{URL: \url{https://github.com/CodingTil/eiuie}}.
+
+\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
+\lstinputlisting[language=Python, caption=Fusion Model,label=lst:fusion]{listings/fusion.py}
+\end{mdframed}
+
+\subsection{Training}\label{sec:training}
+Training of the parameters $w_{c} \in \mathbb{R}^3$ for $c \in \{hsi\}$ is a crucial step for adequate enhancement. Since we are utilizing perceptron networks, we can train these parameters in a supervised learning environment. For this, we need a dataset of images with uneven illumination, as well as the corresponding ground truth images with globally even/corrected illumination. No dataset as such is known to us, and therefore we resorted to the closest alternative: the LOL-dataset consisting of image pairs taken once in low exposure (low-light), and once with normal exposure \cite{wei2018deep}.
+
+For each image pair in the LOL-dataset, we did not only train on the low-light version as input and the normal-light image as output, but also on the normal-light image as both input and output. This way we hope that our model learns optimal parameters to not only enhance dark regions in our image with uneven illumination, but also to not over-enhance bright regions.
+
+In total, we collected $2.4$ billion training samples (pixels). Due to memory constraints, we could only train on half of these samples. We used the Adam optimizer with a learning rate of $0.001$, and a batch size of $2^{15}$. We allowed training for $1000$ epochs, although early stopping took place shortly after epoch $100$. In total, training only took about $10$ minutes on a single NVIDIA L4 Tensor Core GPU.
 
 \section{Results}\label{sec:results}
 
 
-\section{Discussion and Conclusions}
+\section{Discussion and Conclusions}\label{sec:discussion}
 
 
 %%
