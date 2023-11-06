@@ -52,7 +52,7 @@ def get_gaussian_blur(
         gaussian blurred image
     """
     # if ksize == 0, then compute ksize from sigma
-    if ksize is None:
+    if ksize is None or ksize == 0:
         ksize = get_ksize(sigma)
 
     # Gaussian 2D-kernel can be seperable into 2-orthogonal vectors
