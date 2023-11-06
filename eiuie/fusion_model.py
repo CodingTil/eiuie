@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Any, Tuple, List, Dict
+from typing import Optional, Callable, Any, List, Dict
 import os
 
 import numpy as np
@@ -28,12 +28,8 @@ class ChannelNet(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-    def get_params(self) -> Tuple[List[float], float]:
-        # Weights, bias
-        weights, bias = self.fc.weight.data.numpy().flatten(), self.fc.bias.data.numpy()
-        # as python objects
-        weights, bias = weights.tolist(), bias.tolist()
-        return weights, bias
+    def get_params(self) -> List[float]:
+        return self.fc.weight.data.numpy().flatten().tolist()
 
 
 class FusionNet(nn.Module):
@@ -71,7 +67,7 @@ class FusionNet(nn.Module):
         # Concatenate the outputs to get the final output
         return torch.cat((h_out, s_out, i_out), dim=1)
 
-    def get_params(self) -> Dict[str, Tuple[List[float], float]]:
+    def get_params(self) -> Dict[str, List[float]]:
         return {
             "h": self.h_net.get_params(),
             "s": self.s_net.get_params(),
@@ -394,15 +390,10 @@ class FusionModel(bm.BaseModel):
         average_val_loss = total_val_loss / len(val_loader)
         return average_val_loss
 
-    def get_parameters(self):
-        return self.net.parameters()
-
     def pretty_print_parameters(self):
         print("Model parameters:")
-        for channel, (weights, bias) in self.net.get_params().items():
+        for channel, weights in self.net.get_params().items():
             print(f"Channel {channel}:")
             print("Weights:")
             print(weights)
-            print("Bias:")
-            print(bias)
             print()
