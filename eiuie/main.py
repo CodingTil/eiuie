@@ -18,7 +18,14 @@ def main():
     parser.add_argument(
         "command",
         type=str,
-        choices=["single", "batch_process", "prepare_dataset", "train", "eval"],
+        choices=[
+            "single",
+            "batch_process",
+            "prepare_dataset",
+            "train",
+            "eval",
+            "ppparams",
+        ],
         help="Command to run",
     )
 
@@ -69,6 +76,9 @@ def main():
             method.train_model()
         case "eval":
             eval.batch_evaluate()
+        case "ppparams":
+            method = fusion_model.FusionModel()
+            method.pretty_print_parameters()
         case _:
             raise ValueError(f"Unknown command: {args.command}")
 

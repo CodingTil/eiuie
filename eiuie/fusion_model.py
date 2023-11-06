@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, Any, Tuple, List, Dict
 import os
 
 import numpy as np
@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.cuda as cuda
 from torch.utils.data import DataLoader, random_split
-from torch.utils.data.sampler import BatchSampler, RandomSampler
 
 import base_model as bm
 import unsharp_masking as um
@@ -24,10 +23,17 @@ class ChannelNet(nn.Module):
 
     def __init__(self, input_size: int):
         super(ChannelNet, self).__init__()
-        self.fc = nn.Linear(input_size, 1)
+        self.fc = nn.Linear(input_size, 1, bias=False)
 
     def forward(self, x):
         return self.fc(x)
+
+    def get_params(self) -> Tuple[List[float], float]:
+        # Weights, bias
+        weights, bias = self.fc.weight.data.numpy().flatten(), self.fc.bias.data.numpy()
+        # as python objects
+        weights, bias = weights.tolist(), bias.tolist()
+        return weights, bias
 
 
 class FusionNet(nn.Module):
@@ -64,6 +70,13 @@ class FusionNet(nn.Module):
 
         # Concatenate the outputs to get the final output
         return torch.cat((h_out, s_out, i_out), dim=1)
+
+    def get_params(self) -> Dict[str, Tuple[List[float], float]]:
+        return {
+            "h": self.h_net.get_params(),
+            "s": self.s_net.get_params(),
+            "i": self.i_net.get_params(),
+        }
 
 
 class EarlyStopping:
@@ -380,3 +393,16 @@ class FusionModel(bm.BaseModel):
 
         average_val_loss = total_val_loss / len(val_loader)
         return average_val_loss
+
+    def get_parameters(self):
+        return self.net.parameters()
+
+    def pretty_print_parameters(self):
+        print("Model parameters:")
+        for channel, (weights, bias) in self.net.get_params().items():
+            print(f"Channel {channel}:")
+            print("Weights:")
+            print(weights)
+            print("Bias:")
+            print(bias)
+            print()
