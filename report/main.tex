@@ -12,6 +12,9 @@
 \usepackage{xcolor}
 \usepackage[framemethod=tikz]{mdframed}
 \usepackage{tikz}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{csvsimple}
 \usetikzlibrary{shapes,arrows}
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
@@ -52,7 +55,7 @@
 
 \author{Alexander Mühleisen}
 \affiliation{}
-\email{???}
+\email{alexandermuhleisen@gmail.com}
 
 % DATE:
 \date{\today}
@@ -187,6 +190,46 @@ where $P_i$ is the probability that the difference between two adjacent pixels i
 
 
 \section{Results}\label{sec:results}
+In this section, we conduct a comparative analysis of three image enhancement approaches: \textit{Unsharp Masking} (UM), \textit{Retinex} (RTX), \textit{Homomorphic Filtering} (HF), and our proposed fusion model (F). To asses the qualitiy of image enhancement we use visual inspection as well as the utilization of objective metrics such as RMS contrast and discrete entropy. We evaluated our methods using a dataset consisting of ten images.
+
+Figure \ref{fig:visual_comparison_hike3} presents a visual comparison between the three different enhancement methods and our fusion model. The selected example image showcases a dimly illuminated stonewall in the foreground contrasted against a brightly lit landscape in the background. Notably, the original image lacks the clarity to distinguish the separate stones in the wall due to low contrast. All methods, except for unsharp masking, succeed in enhancing the quality of the dimly illuminated part of the image. This enhancement is evident as the individual stones of the wall become visible. Homomorphic filtering performs worse than Fusion and Retinex in this scenario, as it introduces unwanted artifacts in the enhanced dimly illuminated section of the image.
+One major challengs for enhancment methods is to preserve the color of the original image. Unsharp masking performs best in this context, whereas HF results in a green tint in the image, especially in the previously dimly illuminated areas. Both Retinex and our fusion model cause the colors to fade. Besides of the color shift HF, RTX and our fusion model introduce noise to the image. 
+
+
+\begin{figure*}
+    \subfloat[\centering Original]{{\includegraphics[width=0.45\textwidth]{images/hike_3_O.jpg} }}%
+    \qquad
+    \subfloat[\centering Fusion]{{\includegraphics[width=0.45\textwidth]{images/hike_3_F.jpg} }}%
+	\subfloat[\centering Unsharp masking]{{\includegraphics[width=0.45\textwidth]{images/hike_3_UM.jpg} }}%
+    \qquad
+    \subfloat[\centering Retinex]{{\includegraphics[width=0.45\textwidth]{images/hike_3_RTX.jpg} }}%
+	\subfloat[\centering Homomorphic Filtering]{{\includegraphics[width=0.45\textwidth]{images/hike_3_HF.jpg} }}% 
+	\qquad
+    \caption{visual comparison of enhanced images}
+    \label{fig:visual_comparison_hike3}
+\end{figure*}
+
+
+\begin{table}[]
+	\begin{tabular}{l|lllll}
+	 	             & \textbf{O}      & \textbf{F}     & \textbf{UM }    & \textbf{RTX} & \textbf{HF} \\
+	\textbf{Example 1}       &		  &                &       & \\
+	RMS contrast     & 319.57 & 120.11 & 366.01 & 180.75 & 213.33 \\
+	d. entropy       & 5.14   & 6.27 & 5.16   & 6.75  & 6.04\\		 
+    \hline
+	\textbf{Average} (10 s)   &		  &                &       & \\
+	RMS contrast     & 111.00 & 67.12 & 124.91 & 87.71 & 139.92 \\
+	d. entropy       & 3.98   & 4.71  & 4.35   & 4.70  & 4.79\\
+	 
+	\end{tabular}
+	\caption{comparison of Enhancement via RMS contrast and density}
+	\label{tab:image_enhancement_measure}
+\end{table}
+
+ 
+Table \ref{tab:image_enhancement_measure} presents a comparision of the different methods concerning RMS contrast and discrete density. The average values are based on a sample size of 10 different images. Among the methods, unsharp masking and homomorphic filtering demonstrate the most significant improvement in RMS contrast, while our fusion model performs least effectively. Regarding discrete density, Retinex, Homomorphic Filtering and our fusion model show similar performance, while unsharp masking performs the poorest.
+To interpret the varying performance results depending on the measure it is essential to understand what each measure represents. The RMS contrast contains information about the pixel variance of the entire images. Consequently, an increase in contrast within specific areas of an image contributes to an overall increase in RMS contrast measure. Discrete density measures the quantity of information encapsulated within the images. As observed in the visual comparision unsharp masking manage to improve the contrast in already well-illuminated areas of the image. However, it falls short in improving the poorly illuminated segments, leaving them relatively unchanged. Consequently, unsharp image fails to reveal information from the under-illuminated parts. This explains why unsharp masking shows good performance in improving rms contrast but shows significant weaker performance regarding to discrete density.
+The fusion modell significantly increase the discrete density while concurrently reducing the RMS contrast. This observation aligns with our visual assessment, where the fusion model effectively enhanced the details in poorly illuminated areas, bringing out previously hidden information. However, this improvement came at the cost of a reduction in color vibrancy, consequently diminishing the overall contrast in the image which leads to a decrease in rms contrast.
 
 
 \section{Discussion and Conclusions}
