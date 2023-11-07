@@ -11,11 +11,15 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage[framemethod=tikz]{mdframed}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
+\usepackage{caption}
 \usepackage{tikz}
 \usepackage{subcaption}
 \usepackage{graphicx}
 \usepackage{csvsimple}
-\usetikzlibrary{shapes,arrows}
+\usetikzlibrary{shapes,arrows,arrows.meta}
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -63,7 +67,7 @@
 
 
 \begin{abstract}
-
+This paper introduces a method for enhancing images with uneven illumination by leveraging the strengths of ensemble learning. Uneven illumination in images can severely affect the performance of computer vision algorithms and the visual quality for human observers. Our approach combines three classical image enhancement techniques: Unsharp Masking, Retinex, and Homomorphic Filtering, to address different aspects of the problem. These techniques are integrated through an ensemble learning framework that employs a fusion network of perceptrons for each color channel. The proposed method is unique in its application of ensemble learning to this specific problem of image enhancement. The results demonstrate that the method can effectively improve the visibility of details in images and can serve as a robust preprocessing step for further image analysis tasks.
 \end{abstract}
 
 \keywords{image processing, image enhancement, uneven illumination, ensemble learning}
@@ -82,6 +86,13 @@
 
 
 \section{Introduction}\label{sec:intro}
+Image enhancement is a critical preprocessing step in computer vision that improves the visual quality of images, particularly when they suffer from uneven illumination. Uneven illumination can result from various factors such as lighting variances and camera limitations, leading to shadows, glares, and inconsistent brightness levels. Such issues pose significant challenges in downstream tasks like object recognition, segmentation, and tracking, as these algorithms rely heavily on uniform illumination to extract features accurately.
+
+The goal of image enhancement in this context is to compensate for these illumination variances without introducing artifacts or losing important details. Traditional techniques like Unsharp Masking, Retinex, and Homomorphic Filtering address this issue from different angles. However, they can fall short when faced with complex illumination patterns or when one technique's strengths could complement another's weaknesses.
+
+To bridge this gap, we propose a simple ensemble learning-based image enhancement framework that combines the strengths of individual enhancement methods. Ensemble learning, typically used in machine learning for decision-making tasks, can be effectively applied to image processing. By integrating the outputs of different enhancement techniques, we hope to produce a single, high-quality image that benefits from the cumulative strengths of each method. A main research goal of this report is to investigate to which extent the different enhancement methods contribute to the final result, and in which situations the fused image is superior to the individual images produced by the enhancement methods.
+
+The rest of the paper is structured as follows. Section \ref{sec:theory} reviews the current enhancement methods and their theoretical underpinnings. In Section \ref{sec:method} we detail our ensemble learning approach and the training of the fusion network. We then present our experimental results in Section \ref{sec:results}, followed by a discussion of their implications in Section \ref{sec:discussion}. Finally, we conclude with a summary of our findings and suggestions for future work.
 
 \section{Theory}\label{sec:theory}
 In this section we will dive into different methods to enhance images with uneven illumination. We will start with a brief introduction to the problem and then discuss different methods to solve it, as well as how to evaluate the results.
@@ -92,22 +103,22 @@ Uneven illumination refers to the irregular distribution of light intensity acro
 To counter this issue, the goal is to enhance the image in a manner that simulates its capture under uniform illumination conditions. By doing so, we aim to restore a natural appearance to the image, preserving details and minimizing artifacts introduced by uneven lighting. This correction enables better analysis, ensuring that conclusions drawn are based on the actual subject and not on lighting imperfections \cite{dey2019uneven}.
 
 \subsection{Unsharp Masking}\label{sec:unsharp}
-Unsharp masking is a sharpening technique that uses a blurred version of the original image to enhance edges and fine details. The name stems from the fact that the blurred image is subtracted from the original, leaving only the high-frequency components, which are then added back to the original image. This results into an image with sharper edges, more pronounced detail, and more contrast. This approach can be formulated as follows \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}:
+Unsharp masking is a technique to sharpen images, enhancing edges and fine details by utilizing a blurred copy of the image. The technique's somewhat paradoxical name comes from how it operates: by subtracting the blurred version from the original image, it isolates the 'unsharp' or high-frequency parts—the details and edges—then these are amplified and recombined with the original, resulting in a clearer, more defined image. The process can be expressed mathematically as \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}:
 \begin{equation}
-	g(x,y) = f(x,y) + \lambda \cdot (f(x,y) - Blur(f)(x,y))
+g(x,y) = f(x,y) + \lambda \cdot (f(x,y) - Blur(f)(x,y))
 \end{equation}
-where $f(x,y)$ is the input image, $Blur(f)(x,y)$ is the blurred input image, and $\lambda > 0$ is a parameter that controls the strength of the sharpening effect. Typically, a Gaussian filter is used to blur the input image \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}.
+Here, $f(x,y)$ represents the original image, $Blur(f)(x,y)$ is the blurred version of the original image, and $\lambda$ is a positive value determining how much sharpening is applied. The blurring is often achieved with a Gaussian filter, a common choice for such image processing tasks \cite{shi2021unsharp,morishita1988unsharp,deng2010generalized}. An implementation of the unsharp masking algorithm is shown in Listing \ref{lst:unsharp}.
 
 \subsection{Retinex}\label{sec:retinex}
-From a theoretical research field, known as Retinex, which concerns itself with modelling the human visual system, a number of algorithms to enhance the visual appearance of images have appeared. One of these is called Multi Scale Retinex with Chromacity Preservation (MSRCP), which is an extension to the Multi Scale Retinex (MSR) algorithm, that builds on top of the Single Scale Retinex (SSR) algorithm. The SSR algorithm is characterized by the following formula \cite{petro2014multiscale,barnard1998investigations}:
+Retinex theory forms the basis of a research area aimed at replicating human vision perception through models. This field has birthed various algorithms to improve the visual quality of images. Notably, the Multi-Scale Retinex with Chromacity Preservation (MSRCP) algorithm has been developed. MSRCP enhances the original Multi-Scale Retinex (MSR), which itself is an advancement of the Single Scale Retinex (SSR). The SSR is described by the following mathematical expression \cite{petro2014multiscale,barnard1998investigations}:
 \begin{equation}
-	\text{R}_{n_i}(x,y) = \log(f_i(x,y)) - \log(f_i(x,y) \ast F_n(x,y))
+\text{R}{n_i}(x,y) = \log(f_i(x,y)) - \log(f_i(x,y) \ast F_n(x,y))
 \end{equation}
-where $f_i(x,y)$ is the value of the input image at pixel $(x,y)$ in channel $i$, and $F_c(x,y)$ is a Gaussian surround function with a $\sigma = n$. Building on top of SSR, the MSR algorithm is given by \cite{petro2014multiscale,barnard1998investigations}:
+In this formula, $f_i(x,y)$ represents the pixel intensity of the input image at location $(x,y)$ in the $i$-th color channel, while $F_c(x,y)$ is a Gaussian function used to analyze the surrounding pixels with a standard deviation of $\sigma = n$. Building upon SSR, MSR averages the SSR outputs over multiple scales, as indicated here \cite{petro2014multiscale,barnard1998investigations}:
 \begin{equation}
-	\text{R}_{MSR_i}(x,y) = \sum_{n=1}^{N} \omega_n \cdot \text{R}_{n_i}(x,y)
+\text{R}{MSR_i}(x,y) = \sum_{n=1}^{N} \omega_n \cdot \text{R}_{n_i}(x,y)
 \end{equation}
-i.e. MSR is the weighted average of SSR at different scales. Experiments have shown that MSR alone often washes out the color of the image, and therefore the MSRCP algorithm was proposed, which first computes an intermediate image using MSR, and then stretches the colors of that image to use the full color range \cite{petro2014multiscale}. Finally, using both the original image and the intermediate image with color stretching, amplification factors are computed and applied to the original image to enhance it \cite{petro2014multiscale}. An implementation of this approach is shown in Listing \ref{lst:retinex}.
+where $\omega_n$ are the weights for each scale. Research has indicated that while MSR can enhance image details, it may also lead to desaturated colors. Hence, MSRCP was introduced. This method first creates an improved image using MSR and then adjusts this image's colors to span the entire available color range \cite{petro2014multiscale}. Afterward, it combines the color-stretched image with the original to adjust and intensify the original image's colors \cite{petro2014multiscale}. An example of how this is implemented can be found in Listing \ref{lst:retinex}.
 
 \subsection{Homomorphic Filtering}\label{sec:homomorphic}
 The intensity of an image at pixel $(x,y)$ can be described as the product of the illumination $i(x,y)$ and the reflectance $r(x,y)$ \cite{voicu1997practical,fan2011homomorphic}:
@@ -118,7 +129,7 @@ In the frequency domain, illumination changes across the image are typically man
 \begin{equation}
 	\log(f(x,y)) = \log(i(x,y)) + \log(r(x,y))
 \end{equation}
-Applying the Fourier transform to this log-image, a filter $H(u,v)$ can be applied to attenuate the low frequencies, that is the frequencies responsible for illumination changes, and increasing the high frequencies responsible for detail. Afterwards, by applying the inverse Fourier transform and the exponential function, the image can be enhanced \cite{voicu1997practical,fan2011homomorphic}:
+Applying the Fourier transform to this log-image, a filter $H(u,v)$ can be applied to attenuate the low frequencies, that is the frequencies responsible for illumination changes, and increasing the high frequencies responsible for detail. To finish the enhancement, we revert the process by applying an inverse Fourier transform and exponentiation  \cite{voicu1997practical,fan2011homomorphic}:
 \begin{equation}
 	f(x,y) = \exp(\mathcal{F}^{-1}(\mathcal{F}(\log(f(x,y))) \cdot H(u,v)))
 \end{equation}
@@ -147,35 +158,33 @@ This process is illustrated in Figure \ref{fig:homomorphic-pipeline}.
 		\draw[->] (op4) -- (op5);
 		\draw[->] (op5) -- (output);
 	\end{tikzpicture}
-	\caption{Homomorphic filtering pipeline.}
+	\captionof{figure}{Homomorphic filtering pipeline.}
 	\label{fig:homomorphic-pipeline}
 \end{figure}
 
-Many approaches to the linear filter $H(u,v)$ exist. Voicu et al. propose to use a second order Butterworth filter \cite{voicu1997practical}, to reduce the low frequencies and enhance the high frequencies:
+There are numerous types of linear filters that can be applied; Voicu et al. suggest using a Butterworth filter of the second order \cite{voicu1997practical}. This particular filter focuses on reducing the impact of low frequencies while accentuating high frequencies:
 \begin{align}
 	H(u, v) = H'(\rho) = \gamma_1  - \gamma_2 \cdot \frac{1}{1 + 2.415 \cdot \left(\frac{\rho}{\rho_c}\right)^{4}},\\
 	\text{where} \qquad \rho = \sqrt{u^2 + v^2}
 \end{align}
-where $\gamma_H, \gamma_L, \rho_c$ are parameters that can be tuned to achieve the desired effect, and $\gamma_1 \approx \gamma_H, \gamma_2 \approx \gamma_H - \gamma_L$ \cite{voicu1997practical}. The resulting filter has the general form shown in Figure \ref{fig:homomorphic-filter}.
+Here, $\gamma_1$ and $\gamma_2$ are constants that can be adjusted for the desired outcome, with $\gamma_1 \approx \gamma_H$ and $\gamma_2 \approx \gamma_H - \gamma_L$, and $\rho_c$ is the cutoff frequency \cite{voicu1997practical}. The filter's general shape is depicted in Figure \ref{fig:homomorphic-filter}.
 
 \begin{figure}
 	\centering
 	\includegraphics[width=0.45\textwidth]{images/filter.png}
-	\caption{General form of the filter used in homomorphic filtering \cite{voicu1997practical}.}
+	\captionof{figure}{General form of the filter used in homomorphic filtering \cite{voicu1997practical}.}
 	\label{fig:homomorphic-filter}
 \end{figure}
 
-Finally, Fan et al. \cite{fan2011homomorphic} propose  to append a histogram equalization step to the homomorphic filtering pipeline, in order to improve the contrast of the image.
+Additionally, Fan et al. recommend including a step for histogram equalization after the filtering to further improve the image's contrast \cite{fan2011homomorphic}. For color images, the homomorphic filtering process can be applied to each individual color channel,  e.g. the illumination channel of HSI images, or to every channel as in RGB images \cite{voicu1997practical,fan2011homomorphic}. An example of how to implement this approach is provided in Listing \ref{lst:homomorphic}.
 
-In order to enhance colored images using homomorphic filtering, this pipeline can be applied to a single channel, e.g. the illumination channel of HSI images, or all channels, as in RGB images. \cite{voicu1997practical,fan2011homomorphic}. An implementation of this approach is shown in Listing \ref{lst:homomorphic}.
-
-\subsection{Evaluation of Enhancement}\label{sec:evaluation}
-The quality of the enhancement can be evaluated in a few different ways. If the image was enhanced simply to improve its visual appearance, visual inspection often suffices. On the other hand, if the image was enhanced as a preprocessing step for some other computer vision task such as segmentation, the quality of the enhancement should be evaluated by measuring the performance of the computer vision task on the enhanced image. However, there are also some objective metrics that can be used to get an idea of how well an image has been enhanced:
+\subsection{Assessment of Image Enhancement}\label{sec:evaluation}
+Determining the success of image enhancement depends on the purpose of the process. For aesthetic purposes, a simple visual check may be enough to judge improvement. If the enhancement serves as preparation for a subsequent task like image segmentation, its success should be measured based on how it improves the results of that task. Nevertheless, there are specific objective criteria we can use to evaluate enhancement:
 
 \subsubsection{RMS Contrast}\label{sec:rms-contrast}
-Contrast is a measure of the difference in brightness between the darkest and brightest parts of an image, i.e. it is a measure of how well objects are distinguishable. After enhancing an image with uneven illumination, we hope to increase the contrast in the areas of the image that originally had the same illumination. Therefore, an enhanced image might not experience a global increase in contrast, and rather some local increases. The RMS contrast is defined as the variance of the pixel intensities across the entire image \cite{dey2019uneven}:
+Contrast refers to how distinctly the dark and light areas of an image stand apart, essentially how easy it is to distinguish different objects in the picture. When correcting an image with inconsistent lighting, our goal is to better the contrast in regions that were initially similarly lit. Thus, the enhancement may not always boost the overall contrast but could lead to local improvements. RMS contrast is calculated as the standard deviation of pixel intensities across the entire image \cite{dey2019uneven}:
 \begin{equation}
-	\text{RMS Contrast} = \frac{1}{N \cdot M} \sum_{i=1}^{N} \sum_{j=1}^{M} (I(i,j) - \bar{I})^2
+\text{RMS Contrast} = \sqrt{\frac{1}{N \cdot M} \sum_{i=1}^{N} \sum_{j=1}^{M} (I(i,j) - \bar{I})^2}
 \end{equation}
 
 \subsubsection{Discrete Entropy}\label{sec:discrete-entropy}
@@ -185,9 +194,92 @@ Entropy describes the amount of information in an image, where a high entropy me
 \end{equation}
 where $P_i$ is the probability that the difference between two adjacent pixels is $i$.
 
-
 \section{Methodology}\label{sec:method}
+This paper aims to investigate the efficacy of combining Unsharp Masking (UM), Retinex (RTX), and Homomorphic Filtering (HF) enhancement techniques into a coherent ensemble framework. We propose a approach by integrating these methods through a fusion network, comprising three distinct perceptron networks corresponding to each color channel. This section delineates the methodology in detail, including the structure of the fusion network and the training of its parameters.
 
+\subsection{Fusion Network}\label{sec:fusion}
+Our exploration centers on a fusion network that amalgamates the strengths of UM, RTX, and HF, detailed in Sections \ref{sec:unsharp}, \ref{sec:retinex}, and \ref{sec:homomorphic}, respectively. The operational sequence of our model begins with generating intermediate enhanced images through each method, denoted as $g_{UM}$, $g_{RTX}$, and $g_{HF}$. Subsequently, these images are inputted into the fusion network to yield the final enhanced image $g_{F}$.
+
+\begin{algorithm}
+	\caption{Fusion Network}\label{alg:fusion}
+	\begin{algorithmic}
+	\Require $g_{UM}$, $g_{RTX}$, $g_{HF}$ in HSI color space
+	\Require $w_{c} \in \mathbb{R}^3$ for $c \in \{hsi\}$
+	\Ensure $N \coloneqq \text{width}(g_{UM}) = \text{width}(g_{RTX}) = \text{width}(g_{HF})$
+	\Ensure $M \coloneqq \text{height}(g_{UM}) = \text{height}(g_{RTX}) = \text{height}(g_{HF})$
+	\State $g_{F} \gets 0^{N \times M \times 3}$
+	\For{$c \in \{hsi\}$}
+		\For{$(x,y) \in \{1, \dots, N\} \times \{1, \dots, M\}$}
+			\State $g_{F}(x,y,c) \gets w_{c_1} \cdot g_{UM}(x,y,c)$
+			\State \qquad \qquad \qquad  $+ w_{c_2} \cdot g_{RTX}(x,y,c)$
+			\State \qquad \qquad \qquad $+ w_{c_3} \cdot g_{HF}(x,y,c)$
+		\EndFor
+	\EndFor
+	\State \Return $g_{F}$
+	\end{algorithmic}
+	\end{algorithm}
+
+The fusion network is constructed from three individual perceptron networks, each tailored for a specific channel of the HSI color space. For any given pixel at coordinates $(x,y)$, each perceptron receives three inputs: the values of channel $c \in {hsi}$ from $g_{UM}$, $g_{RTX}$, and $g_{HF}$. The output is the channel $c$ of the pixel $(x,y)$ in $g_{F}$. The fusion process is algorithmically represented in Algorithm \ref{alg:fusion}. The weights $w_{c} \in \mathbb{R}^3$, for each channel $c \in {hsi}$, are parameters that determine the influence of each intermediate image and are optimized during the training process, as discussed in Section \ref{sec:training}. In our experiments, the use of bias was omitted. The fusion process is visually summarized in Figure \ref{fig:fusion-pipeline}.
+
+\begin{figure}
+	\centering
+	\begin{tikzpicture}[node distance=2cm, auto]
+		% Define the style for the operation nodes
+		\tikzstyle{operation}=[rectangle, draw=black, minimum size=0.8cm, text centered]
+
+		% Define nodes
+		\node (input) {$f$};
+		\node (RTX) [operation, right of=input] {RTX};
+		\node (UM) [operation, above of=RTX] {UM};
+		\node (HF) [operation, below of=RTX] {HF};
+		\node (g_UM) [right of=UM] {$g_{UM}$};
+		\node (g_RTX) [right of=RTX] {$g_{RTX}$};
+		\node (g_HF) [right of=HF] {$g_{HF}$};
+		\node (H) [operation, right of=g_UM] {$\text{fusion}_h$};
+		\node (S) [operation, right of=g_RTX] {$\text{fusion}_s$};
+		\node (I) [operation, right of=g_HF] {$\text{fusion}_i$};
+		\node (output) [right of=S] {$g_F$};
+
+		% Define edges
+		\draw[->] (input) -- (UM);
+		\draw[->] (input) -- (RTX);
+		\draw[->] (input) -- (HF);
+
+		\draw[->] (UM) -- (g_UM);
+		\draw[->] (RTX) -- (g_RTX);
+		\draw[->] (HF) -- (g_HF);
+
+		\draw[red,thick,arrows = {->}] (g_UM) -- (H);
+		\draw[red,thick,arrows = {->}] (g_RTX) -- (H);
+		\draw[red,thick,arrows = {->}] (g_HF) -- (H);
+		\draw[green,thick,arrows = {->}, dashed] (g_UM) -- (S);
+		\draw[green,thick,arrows = {->}, dashed] (g_RTX) -- (S);
+		\draw[green,thick,arrows = {->}, dashed] (g_HF) -- (S);
+		\draw[blue,thick,arrows = {->}, dotted] (g_UM) -- (I);
+		\draw[blue,thick,arrows = {->}, dotted] (g_RTX) -- (I);
+		\draw[blue,thick,arrows = {->}, dotted] (g_HF) -- (I);
+
+		\draw[red,thick,arrows = {->}] (H) -- (output);
+		\draw[green,thick,arrows = {->}, dashed] (S) -- (output);
+		\draw[blue,thick,arrows = {->}, dotted] (I) -- (output);
+	\end{tikzpicture}
+	\captionof{figure}{Pipeline of the fusion network approach. Red solid arrows symbolize the fusion of the hue channel, green dashed arrows symbolize the fusion of the saturation channel, and blue dotted arrows symbolize the fusion of the intensity channel.}
+	\label{fig:fusion-pipeline}
+\end{figure}
+
+\subsection{Implementation}\label{sec:implementation}
+For the implementation of our fusion network, we employed the \texttt{PyTorch} machine learning framework. It involves three distinct linear fully connected layers, one for each color channel. An abridged version of the code for the fusion network is presented in Listing \ref{lst:fusion}. Comprehensive explanations of the theoretical underpinnings and implementations for UM, RTX, and HF are provided in Sections \ref{sec:unsharp}, \ref{sec:retinex}, and \ref{sec:homomorphic}, with corresponding code snippets in Listings \ref{lst:unsharp}, \ref{lst:retinex}, and \ref{lst:homomorphic}. The entire codebase is made accessible on GitHub\footnote{URL: \url{https://github.com/CodingTil/eiuie}}.
+
+\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
+\lstinputlisting[language=Python, caption=Fusion Model,label=lst:fusion]{listings/fusion.py}
+\end{mdframed}
+
+\subsection{Training}\label{sec:training}
+The training of the weight parameters $w_{c} \in \mathbb{R}^3$ for each channel $c \in {hsi}$ is imperative for effective image enhancement. Leveraging the perceptron networks, the weights are refined through supervised learning. In an optimal setting, our training dataset comprises images with uneven illumination and their evenly illuminated counterparts. However, no such dataset is known to us. Due to the absence of a directly relevant dataset, we adapted the LOL-dataset, which includes image pairs with low and normal exposure \cite{wei2018deep}.
+
+The training process involved using both the low-light and normal-light images from each pair as input, with the normal-light images always serving as the target output. This dual-input strategy was intended to calibrate the model to enhance underexposed areas without exaggerating well-lit sections.
+
+With a dataset size of approximately $2.4$ billion samples (pixels), we were limited by memory constraints to utilize only half of this dataset. We adopted the Adam optimizer with a learning rate of $0.001$ and a batch size of $2^{15}$. The training was set to run for $1000$ epochs, but early stopping criteria were met shortly after the $100$th epoch. Remarkably, the entire training process was completed in about 10 minutes on a single NVIDIA L4 Tensor Core GPU.
 
 \section{Results}\label{sec:results}
 In this section, we conduct a comparative analysis of three image enhancement approaches: \textit{Unsharp Masking} (UM), \textit{Retinex} (RTX), \textit{Homomorphic Filtering} (HF), and our proposed fusion model (F). To asses the qualitiy of image enhancement we use visual inspection as well as the utilization of objective metrics such as RMS contrast and discrete entropy. We evaluated our methods using a dataset consisting of ten images.
@@ -232,7 +324,7 @@ To interpret the varying performance results depending on the measure it is esse
 The fusion modell significantly increase the discrete density while concurrently reducing the RMS contrast. This observation aligns with our visual assessment, where the fusion model effectively enhanced the details in poorly illuminated areas, bringing out previously hidden information. However, this improvement came at the cost of a reduction in color vibrancy, consequently diminishing the overall contrast in the image which leads to a decrease in rms contrast.
 
 
-\section{Discussion and Conclusions}
+\section{Discussion and Conclusions}\label{sec:discussion}
 
 
 %%
@@ -254,14 +346,14 @@ The fusion modell significantly increase the discrete density while concurrently
 \lstinputlisting[language=Python, caption=Unsharp masking,label=lst:unsharp]{listings/unsharp_masking.py}
 \end{mdframed}
 
-\subsection{Retinex}\label{sec:retinex-listing}
-\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
-\lstinputlisting[language=Python, caption=Retinex,label=lst:retinex]{listings/retinex.py}
-\end{mdframed}
-
 \subsection{Homomorphic Filtering}\label{sec:homomorphic-listing}
 \begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
 \lstinputlisting[language=Python, caption=Homomorphic filtering, label=lst:homomorphic]{listings/homomorphic_filtering.py}
+\end{mdframed}
+
+\subsection{Retinex}\label{sec:retinex-listing}
+\begin{mdframed}[backgroundcolor=backcolour,leftmargin=0cm,hidealllines=true,innerleftmargin=0cm,innerrightmargin=0cm,innertopmargin=0cm,innerbottommargin=-0.65cm]
+\lstinputlisting[language=Python, caption=Retinex,label=lst:retinex]{listings/retinex.py}
 \end{mdframed}
 
 \end{document}
