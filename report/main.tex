@@ -349,9 +349,10 @@ The weights of the fusion model (table \ref{tab:weights}) indicate that the unsh
 
 Regarding to color vibrancy and overall contrast our fusion model performance significant worse than the other methdos. This might be due to the fact that the fusion model is trained on a dataset consisting of images with low and normal exposure. Consequently, the fusion model is calibrated to enhance underexposed areas without exaggerating well-lit sections. This calibration is not optimal for enhancing images with uneven illumination. Therefore, the fusion model is not able to enhance the well-lit sections of the image as effectively as the other methods. This is also reflected in the weights of the fusion model (table \ref{tab:weights}), where the weights of the unsharp masking method are relatively low across all channels.
 
-\section{Conclusion and future work}\label{sec:conclusion}
+\section{Conclusion}\label{sec:conclusion}
 
-
+The goal of this paper was to investigate the efficacy of combining Unsharp Masking (UM), Retinex (RTX), and Homomorphic Filtering (HF) enhancement techniques into a coherent ensemble framework. We proposed a approach by integrating these methods through a fusion network, comprising three distinct perceptron networks corresponding to each color channel. The weights of the fusion network are trained using a dataset consisting of images with low and normal exposure. 
+The results of our experiments demonstrate that the fusion model effectively enhances the details in poorly illuminated areas without introducing unwanted artifacts like Homomorphic filtering. However, concerning color vibrancy, the fusion model lags behind the other methods. This is noticeable in the visual comparison as well as in the results of the objective metrics. The fusion model significantly increases the discrete density while concurrently reducing the RMS contrast. This observation aligns with our visual assessment, where the fusion model effectively enhanced the details in poorly illuminated areas, revealing hidden information at the cost of faded colors.
 
 
 
