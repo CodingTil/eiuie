@@ -323,8 +323,39 @@ Table \ref{tab:image_enhancement_measure} presents a comparision of the differen
 To interpret the varying performance results depending on the measure it is essential to understand what each measure represents. The RMS contrast contains information about the pixel variance of the entire images. Consequently, an increase in contrast within specific areas of an image contributes to an overall increase in RMS contrast measure. Discrete density measures the quantity of information encapsulated within the images. As observed in the visual comparision unsharp masking manage to improve the contrast in already well-illuminated areas of the image. However, it falls short in improving the poorly illuminated segments, leaving them relatively unchanged. Consequently, unsharp image fails to reveal information from the under-illuminated parts. This explains why unsharp masking shows good performance in improving rms contrast but shows significant weaker performance regarding to discrete density.
 The fusion modell significantly increase the discrete density while concurrently reducing the RMS contrast. This observation aligns with our visual assessment, where the fusion model effectively enhanced the details in poorly illuminated areas, bringing out previously hidden information. However, this improvement came at the cost of a reduction in color vibrancy, consequently diminishing the overall contrast in the image which leads to a decrease in rms contrast.
 
+\begin{table}
+	\begin{tabular}{l|lll}
+					& UM 	& RTX 		& HF     \\
+		Hue 	  	& 0.0994	& 0.2782	& 0.5596  \\
+		Saturation 	& 0.1376	& -0.0597	& 0.3378  \\
+		Intensity  	& 0.0032	& 0.3836	& 0.4488  \\
+		
+	\end{tabular}
+	\caption{wheigts for each chanel}
+	\label{tab:weights}
+\end{table}
 
-\section{Discussion and Conclusions}\label{sec:discussion}
+Table \ref{tab:weights} shows the weights associated to each method for each channel within the fusion model. The weights attributed to the unsharp masking method  are relatively low across all channels, indicating a minor contribution to the fusion model. Conversely, the Homomorphic Filtering method exhibits the highest weights across all channels, signifying its substantial role within the fusion model. Note that the  weight for the saturation chanel of the Retinex method is negative. This indicates that the saturation chanel of the Retinex method is substracted in the fusion model. 
+
+
+
+\section{Discussion}\label{sec:discussion}
+In this section we discuss the implications of our proposed fusion model. 
+
+The visual comparison demonstrates that each enhancement method exhibits strengths and weaknesses. Unsharp Masking is particularly proficient in preserving color information and increasing contrast in already well-illuminated areas but was less effective in enhancing poorly illuminated parts of the image. Retinex and Homomorphic Filtering show noticeable improvements in dimly illuminated sections, enhancing the visibility of finer details but at the expense of color preservation. However, Homomorphic Filtering introduces unwanted artifacts, especially in the enhanced dimly illuminated areas.
+The idea behind our fusion model is to combine the strengths of each method, resulting in a more balanced enhancement. The results of our experiments demonstrate that the fusion model effectively enhances the details in poorly illuminated areas without introducing unwanted artifacts like Homomorphic filtering. However, concerning color vibrancy, the fusion model lags behind the other methods. This is noticeable in the visual comparison as well as in the results of the objective metrics. The fusion model significantly increases the discrete density while concurrently reducing the RMS contrast. This observation aligns with our visual assessment, where the fusion model effectively enhanced the details in poorly illuminated areas, revealing hidden information at the cost of faded colors.
+
+The weights of the fusion model (table \ref{tab:weights}) indicate that the unsharp masking method plays a minor role within the fusion model. This is in line with our visual assessment, where the unsharp masking method was the least effective in enhancing the details in poorly illuminated areas. The Homomorphic Filtering method exhibits the highest weights across all channels, signifying its substantial role within the fusion model. This is also in line with our visual assessment, where the Homomorphic Filtering method was the most effective in enhancing the details in poorly illuminated areas. However the fusion model manage to outperform the Homomorphic Filtering regarding to enhancing poorly illuminated areas while concurrently reducing the unwanted artifacts introduced by the Homomorphic Filtering method.
+
+Regarding to color vibrancy and overall contrast our fusion model performance significant worse than the other methdos. This might be due to the fact that the fusion model is trained on a dataset consisting of images with low and normal exposure. Consequently, the fusion model is calibrated to enhance underexposed areas without exaggerating well-lit sections. This calibration is not optimal for enhancing images with uneven illumination. Therefore, the fusion model is not able to enhance the well-lit sections of the image as effectively as the other methods. This is also reflected in the weights of the fusion model (table \ref{tab:weights}), where the weights of the unsharp masking method are relatively low across all channels.
+
+\section{Conclusion and future work}\label{sec:conclusion}
+
+
+
+
+
+
 
 
 %%
